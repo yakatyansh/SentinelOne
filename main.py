@@ -2,6 +2,7 @@ import sys
 import discord
 from discord.ext import commands
 import os
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,17 +19,21 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event 
 async def on_ready():
-    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
+    print(f'✅ Logged in as {bot.user.name} (ID: {bot.user.id})')
     print('------')
 
-initial_extensions = ['cogs.punishments','cogs.reports']  
+async def load_extensions():
+    initial_extensions = ['cogs.punish', 'cogs.reports']
+    for ext in initial_extensions:
+        try:
+            await bot.load_extension(ext)
+            print(f'🔧 Loaded extension: {ext}')
+        except Exception as e:
+            print(f'❌ Failed to load extension {ext}', file=sys.stderr)
+            print(e)
 
-for ext in initial_extensions:
-    try:
-        bot.load_extension(ext)
-        print(f'Loaded extension: {ext}')
-    except Exception as e:
-        print(f'Failed to load extension {ext}.', file=sys.stderr)
-        print(e)
+async def main():
+    await load_extensions()
+    await bot.start(TOKEN)
 
-bot.run(TOKEN)          
+asyncio.run(main())

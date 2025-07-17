@@ -3,3 +3,4 @@ bot
 .git
 __pycache__
 *.pyc
+.env 
