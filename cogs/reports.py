@@ -13,6 +13,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class ReportSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.active_reports = set()  # Track active reports to prevent duplicates
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -59,6 +60,14 @@ class ReportSystem(commands.Cog):
             except discord.Forbidden:
                 pass
             return
+
+        # Create unique report ID to prevent duplicates
+        report_id = f"{user.id}_{message.id}"
+        if report_id in self.active_reports:
+            print(f"[DEBUG] Report already in progress for {report_id}")
+            return
+        
+        self.active_reports.add(report_id)
 
         try:
             # Create DM channel and send prompt
@@ -133,6 +142,10 @@ class ReportSystem(commands.Cog):
                 await user.send("❌ **An error occurred while processing your report.**\nPlease contact a moderator directly.")
             except:
                 pass
+        
+        finally:
+            # Always remove from active reports when done
+            self.active_reports.discard(report_id)
 
 # Bot events for debugging
 @bot.event
