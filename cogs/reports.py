@@ -25,31 +25,13 @@ class ReportSystem(commands.Cog):
 
         # Get guild
         guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
-            print("[DEBUG] Guild not found.")
-            return
-
-        # Get user who reacted
         user = guild.get_member(payload.user_id)
-        if not user or user.bot:
-            print(f"[DEBUG] User is bot or not found. User: {user}")
-            return
-
-        # Get channel
         channel = guild.get_channel(payload.channel_id)
-        if not channel:
-            print("[DEBUG] Channel not found.")
-            return
-
-        # Get message
         try:
             message = await channel.fetch_message(payload.message_id)
-            print(f"[DEBUG] Found message: {message.content[:50]}...")
         except discord.NotFound:
-            print("[DEBUG] Message not found.")
             return
         except discord.Forbidden:
-            print("[DEBUG] No permission to fetch message.")
             return
 
         # Don't allow reporting your own messages
@@ -61,7 +43,6 @@ class ReportSystem(commands.Cog):
             return
 
         try:
-            # Create DM channel and send prompt
             await user.send(
                 f"🚨 **Report System**\n"
                 f"You are reporting a message from **{message.author.display_name}** in **#{channel.name}**.\n\n"
@@ -71,9 +52,7 @@ class ReportSystem(commands.Cog):
                 f"*You have 60 seconds to respond.*"
             )
 
-            print(f"[DEBUG] DM sent to {user.display_name}. Waiting for response...")
 
-            # Wait for DM response
             def check(m):
                 return (
                     m.author.id == user.id and 
@@ -103,17 +82,12 @@ class ReportSystem(commands.Cog):
                     embed.add_field(name="Message link", value=f"[Jump to message]({message.jump_url})", inline=False)
 
                     await log_channel.send(embed=embed)
-                    print("[DEBUG] Report successfully logged with embed.")
-                else:
-                    print(f"[ERROR] Log channel with ID {log_channel_id} not found.")
 
                 # Send confirmation
                 await user.send("✅ **Thank you for your report!**\nOur moderation team will review it shortly.")
-                print(f"[DEBUG] Report completed for {user.display_name}")
 
             except asyncio.TimeoutError:
                 await user.send("⏰ **Report timed out.**\nYou took too long to respond. Please try again if needed.")
-                print(f"[DEBUG] Report timed out for {user.display_name}")
 
         except discord.Forbidden:
             # User has DMs disabled
@@ -134,26 +108,6 @@ class ReportSystem(commands.Cog):
             except:
                 pass
 
-# Bot events for debugging
-@bot.event
-async def on_ready():
-    print(f"[INFO] {bot.user} has connected to Discord!")
-    print(f"[INFO] Bot is in {len(bot.guilds)} guilds")
-
-@bot.event  
-async def on_guild_join(guild):
-    print(f"[INFO] Joined guild: {guild.name} (ID: {guild.id})")
-
-@bot.event
-async def on_command_error(ctx, error):
-    print(f"[ERROR] Command error: {error}")
-
-# Test command to verify bot is working
-@bot.command(name="test_report")
-@commands.has_permissions(administrator=True)
-async def test_report(ctx):
-    """Test command for admins to verify the report system is loaded"""
-    await ctx.send("✅ Report system is active! React with 🆘 to any message to test it.")
 
 # Load the cog
 async def setup(bot):
