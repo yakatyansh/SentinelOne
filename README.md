@@ -94,7 +94,3 @@ PRs and suggestions are welcome! This bot is a WIP and designed specifically for
 ## 📄 License
 
 MIT License – feel free to use, modify, and share.
-
----
-
-Let me know when you’re done with final changes or want to include extra features like auto-moderation, profanity filter, or welcome messages, and I’ll update the README accordingly.
