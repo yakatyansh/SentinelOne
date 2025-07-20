@@ -15,7 +15,6 @@ class ReportSystem(commands.Cog):
             self.db_initialized = True
     
     async def cog_unload(self):
-        """Called when the cog is unloaded"""
         await close_database()
 
     @commands.Cog.listener()

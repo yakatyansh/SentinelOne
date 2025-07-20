@@ -286,24 +286,3 @@ class MutePointHelper:
         embed.add_field(name="Message link", value=f"[Jump to message]({message.jump_url})", inline=False)
         
         return embed
-
-# Example usage and testing functions
-if __name__ == "__main__":
-    # Test the classification system
-    test_reasons = [
-        "This user is spamming the chat",
-        "Harassment and personal attacks against me",
-        "They used hate speech and slurs",
-        "Raiding our server with bots",
-        "Being toxic and rude to everyone"
-    ]
-    
-    print("=== Mute Point System Test ===")
-    for reason in test_reasons:
-        points = MutePointSystem.classify_offense(reason)
-        duration = MutePointSystem.get_mute_duration(points)
-        duration_text = MutePointSystem.format_duration(duration)
-        print(f"Reason: '{reason}' → {points} MP → {duration_text}")
-    
-    print(f"\n=== All Categories ===")
-    print(MutePointSystem.get_all_categories_formatted())
