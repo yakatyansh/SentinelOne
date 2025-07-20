@@ -4,6 +4,8 @@ from utils import  db  # Update import to use mongo.py
 from datetime import datetime
 import traceback
 from .mutepoint import MutePointSystem, MutePointHelper
+from utils.db import clear_user_points
+import asyncio  # Add this for TimeoutError handling
 
 class Punishments(commands.Cog):
     def __init__(self, bot):
@@ -264,6 +266,38 @@ class Punishments(commands.Cog):
         except Exception as e:
             traceback.print_exc()
             await ctx.send(f"❌ Failed to retrieve points for {member.mention}.")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def clearpoints(self, ctx, member: discord.Member = None):
+        """
+        Clear mute points for a user or the entire server
+        Usage: !clearpoints [@user] - If no user is specified, clears points for entire server
+        """
+        try:
+            if member:
+                count = await db.clear_user_points(ctx.guild.id, member.id)
+                await ctx.send(f"✅ Cleared {count} punishment records for {member.mention}")
+            else:
+                # Ask for confirmation before clearing all points
+                confirm_msg = await ctx.send("⚠️ Are you sure you want to clear ALL mute points for the entire server? React with ✅ to confirm.")
+                await confirm_msg.add_reaction("✅")
+                
+                try:
+                    def check(reaction, user):
+                        return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirm_msg.id
+                    
+                    await self.bot.wait_for('reaction_add', timeout=30.0, check=check)
+                    
+                    count = await clear_user_points(ctx.guild.id)
+                    await ctx.send(f"✅ Cleared {count} punishment records for the entire server")
+                
+                except asyncio.TimeoutError:
+                    await ctx.send("❌ Confirmation timed out. No points were cleared.")
+                    
+        except Exception as e:
+            await ctx.send(f"❌ Error clearing points: {str(e)}")
+            traceback.print_exc()
 
     @punish.error
     async def punish_error(self, ctx, error):

@@ -8,7 +8,7 @@ import asyncio
 
 
 MONGODB_URL = os.getenv('MONGO_URI')
-DATABASE_NAME = os.getenv("DATABASE_NAME", "discord_moderation")
+DATABASE_NAME = os.getenv("SentinelOne")
 
 class DatabaseManager:
     def __init__(self):
@@ -16,12 +16,14 @@ class DatabaseManager:
         self.db = None
         self.punishments = None
         self.guild_settings = None
+        self.users = None  # Add this line
     
     async def connect(self):
         self.client = AsyncIOMotorClient(MONGODB_URL)
         self.db = self.client[DATABASE_NAME]
         self.punishments = self.db.punishments
         self.guild_settings = self.db.guild_settings
+        self.users = self.db.Users  # Add this line
         
         await self._create_indexes()
     
@@ -33,6 +35,9 @@ class DatabaseManager:
         await self.punishments.create_index([("timestamp", -1)])
         
         await self.guild_settings.create_index([("guild_id", 1)], unique=True)
+        
+        # Add indexes for the Users collection
+        await self.users.create_index([("guild_id", 1), ("_id", 1)], unique=True)
     
     async def close(self):
         if self.client:
@@ -47,23 +52,51 @@ async def close_database():
     await db_manager.close()
 
 async def insert_punishment(guild_id: int, user_id: int, mod_id: int, reason: str, timestamp: str, points: int) -> int:
-    print("insert_punishment called")
+    """Insert a new punishment record and update user's points"""
+    print("[DATABASE] Inserting new punishment record...")
     
     punishment_doc = {
         "guild_id": guild_id,
         "user_id": user_id,
         "mod_id": mod_id,
         "reason": reason,
-        "timestamp": timestamp,
         "points": points,
+        "timestamp": timestamp,
         "created_at": datetime.utcnow()
+
     }
-    
-    await db_manager.punishments.insert_one(punishment_doc)
-    
-    total_points = await get_user_total_points(guild_id, user_id)
-    
-    return total_points
+
+    user_update = {
+        "$inc": {"points": points},
+        "$push": {
+            "history": {
+                "reason": reason,
+                "points": points,
+                "timestamp": timestamp,
+                "mod_id": mod_id
+            }
+        },
+        "$setOnInsert": {
+            "last_decay": datetime.utcnow()
+        }
+    }
+
+    try:
+        await db_manager.punishments.insert_one(punishment_doc)
+        
+        await db_manager.users.update_one(
+            {"_id": user_id, "guild_id": guild_id},
+            user_update,
+            upsert=True
+        )
+        
+        total_points = await get_user_total_points(guild_id, user_id)
+        print(f"[DATABASE] Successfully updated points. New total: {total_points}")
+        return total_points
+        
+    except Exception as e:
+        print(f"[DATABASE ERROR] Failed to insert punishment: {str(e)}")
+        raise
 
 async def get_punishments(guild_id: Optional[int] = None, user_id: Optional[int] = None) -> List[Dict]:
     query = {}
@@ -83,26 +116,15 @@ async def get_punishments(guild_id: Optional[int] = None, user_id: Optional[int]
     return results
 
 async def get_user_total_points(guild_id: int, user_id: int) -> int:
-    pipeline = [
-        {
-            "$match": {
-                "guild_id": guild_id,
-                "user_id": user_id
-            }
-        },
-        {
-            "$group": {
-                "_id": None,
-                "total_points": {"$sum": "$points"}
-            }
-        }
-    ]
-    
-    result = await db_manager.punishments.aggregate(pipeline).to_list(1)
-    
-    if result:
-        return result[0]["total_points"]
-    return 0
+    """Get user's current total points"""
+    try:
+        user_doc = await db_manager.users.find_one(
+            {"_id": user_id, "guild_id": guild_id}
+        )
+        return user_doc.get("points", 0) if user_doc else 0
+    except Exception as e:
+        print(f"[DATABASE ERROR] Failed to get total points: {str(e)}")
+        return 0
 
 async def get_user_punishments(guild_id: int, user_id: int, limit: int = 10) -> List[Dict]:
     query = {
@@ -318,3 +340,29 @@ class DatabaseContext:
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await close_database()
+
+async def clear_user_points(guild_id: int, user_id: Optional[int] = None) -> int:
+    """
+    Clear mute points for a specific user or all users in a guild
+    
+    Args:
+        guild_id: The guild ID
+        user_id: Optional user ID. If None, clears points for all users in the guild
+        
+    Returns:
+        int: Number of records cleared
+    """
+    query = {"guild_id": guild_id}
+    if user_id is not None:
+        query["user_id"] = user_id
+        
+    result = await db_manager.punishments.delete_many(query)
+    removed_count = result.deleted_count
+    
+    if removed_count > 0:
+        if user_id:
+            print(f"Cleared {removed_count} punishment records for user {user_id} in guild {guild_id}")
+        else:
+            print(f"Cleared {removed_count} punishment records for guild {guild_id}")
+    
+    return removed_count

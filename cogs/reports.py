@@ -150,7 +150,7 @@ class ReportSystem(commands.Cog):
                     duration_text = MutePointSystem.format_duration(mute_duration)
                     punishment_action = f"{status_msg} for {duration_text}"
 
-                log_channel_id = 771072621595983893  
+                log_channel_id = 1395499760676376577
                 log_channel = guild.get_channel(log_channel_id)
                 
                 if log_channel:
