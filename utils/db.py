@@ -44,4 +44,4 @@ def clear_points(guild_id, user_id):
 
 def get_points(guild_id, user_id):
     user = users_collection.find_one({"_id": f"{guild_id}-{user_id}"})
-    return user["points"] if user else 0
+    return user["total_points"] if user else 4

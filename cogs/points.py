@@ -16,7 +16,7 @@ class Points(commands.Cog):
     @bot.command(name="getpoints")
     async def getpoints(self, ctx, member: discord.Member):
         """Get the total mute points for a member."""
-        points = db.get_points(ctx.guild.id, member.id)
+        total_points = db.get_points(ctx.guild.id, member.id)
         await ctx.send(f"{member.mention} has a total of **{total_points} MP**.")
 
     @bot.command(name="clearpoints")
