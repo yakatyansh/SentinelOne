@@ -40,8 +40,8 @@ def add_punishment(guild_id: int, user_id: int, reason: str, points: int) -> int
         return points
 
 def clear_points(guild_id, user_id):
-    users_collection.delete_one({"_id": f"{guild_id}-{user_id}"})
+    users_collection.delete_one({"guild_id": guild_id, "user_id": user_id})
 
 def get_points(guild_id, user_id):
-    user = users_collection.find_one({"_id": f"{guild_id}-{user_id}"})
-    return user["total_points"] if user else 4
+    user = users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
+    return user["total_points"] if user else 0

@@ -15,54 +15,139 @@ class ReportSystem(commands.Cog):
         self.bot = bot
 
     @commands.Cog.listener()
-    
     async def on_raw_reaction_add(self, payload):
-        if payload.emoji.name == '🆘':
-            print(f"Reaction added by {payload.user_id} in guild {payload.guild_id} on message {payload.message_id}")
+        # Check if it's the SOS emoji (🆘)
+        if str(payload.emoji) != '🆘':
+            print(f"[DEBUG] Ignoring emoji: {payload.emoji}")
+            return
 
+        print(f"[DEBUG] SOS reaction detected by user {payload.user_id}")
 
+        # Get guild
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            print("[DEBUG] Guild not found.")
+            return
 
-            guild = self.bot.get_guild(payload.guild_id)
-            if not guild:
-                return
-            
-            channel = guild.get_channel(payload.channel_id)
+        # Get user who reacted
+        user = guild.get_member(payload.user_id)
+        if not user or user.bot:
+            print(f"[DEBUG] User is bot or not found. User: {user}")
+            return
+
+        # Get channel
+        channel = guild.get_channel(payload.channel_id)
+        if not channel:
+            print("[DEBUG] Channel not found.")
+            return
+
+        # Get message
+        try:
             message = await channel.fetch_message(payload.message_id)
-            user = guild.get_member(payload.user_id)
+            print(f"[DEBUG] Found message: {message.content[:50]}...")
+        except discord.NotFound:
+            print("[DEBUG] Message not found.")
+            return
+        except discord.Forbidden:
+            print("[DEBUG] No permission to fetch message.")
+            return
 
-            if user.bot:
-                return
-            
-            try :
-                dm = await user.create_dm()
-                prompt = await dm.send(
-                    f"You reported a message from **{message.author}** in **#{channel}**.\n"
-                    f"Content: \"{message.content}\"\n\n"
-                    f"Please reply with the reason for reporting this message. You have 60 seconds."
-                )
-                def check(m):
-                    return m.author == user and m.channel == dm and m.reference is None
-                
-                response = await self.bot.wait_for('message', check=check, timeout=60.0)
-                await prompt.delete()
-                await response.delete() 
-
-                log_channel = guild.get_channel(1395499760676376577)
-                if log_channel:
-                     log_channel.send(
-                        f"🚨 **Report Received**\n"
-                        f"**Reported By:** {user.mention}\n"
-                        f"**Message By:** {message.author.mention}\n"
-                        f"**Channel:** {channel.mention}\n"
-                        f"**Content:** {message.content}\n"
-                        f"**Reason:** {response.content}"
-                    )
-                
-            except asyncio.TimeoutError:
-                await dm.send("You took too long to respond. Report cancelled.")
+        # Don't allow reporting your own messages
+        if message.author.id == user.id:
+            try:
+                await user.send("❌ You cannot report your own messages.")
             except discord.Forbidden:
-                await channel.send(
-                    f"{user.mention}, I cannot send you a direct message. Please enable DMs from server members to use the report feature."
+                pass
+            return
+
+        try:
+            # Create DM channel and send prompt
+            await user.send(
+                f"🚨 **Report System**\n"
+                f"You are reporting a message from **{message.author.display_name}** in **#{channel.name}**.\n\n"
+                f"**Message content:**\n"
+                f">>> {message.content[:1000] if message.content else '*[No text content]*'}\n\n"
+                f"**Please reply with your reason for reporting this message.**\n"
+                f"*You have 60 seconds to respond.*"
+            )
+
+            print(f"[DEBUG] DM sent to {user.display_name}. Waiting for response...")
+
+            # Wait for DM response
+            def check(m):
+                return (
+                    m.author.id == user.id and 
+                    isinstance(m.channel, discord.DMChannel) and 
+                    len(m.content.strip()) > 0  # Ensure they actually typed something
                 )
+
+            try:
+                response = await self.bot.wait_for('message', check=check, timeout=60.0)
+                print(f"[DEBUG] Received response: {response.content[:50]}...")
+
+                # Send to log channel
+                log_channel_id = 771065948764372996  # Replace with your actual log channel ID
+                log_channel = guild.get_channel(log_channel_id)
+                
+                if log_channel:
+                    embed = discord.Embed(
+                        title="🚨 Message Reported",
+                        color=discord.Color.red(),
+                        timestamp=discord.utils.utcnow()
+                    )
+                    embed.add_field(name="Reported by", value=f"{user.mention} ({user.id})", inline=True)
+                    embed.add_field(name="Message author", value=f"{message.author.mention} ({message.author.id})", inline=True)
+                    embed.add_field(name="Channel", value=f"{channel.mention}", inline=True)
+                    embed.add_field(name="Message content", value=message.content[:1024] if message.content else "*[No text content]*", inline=False)
+                    embed.add_field(name="Report reason", value=response.content[:1024], inline=False)
+                    embed.add_field(name="Message link", value=f"[Jump to message]({message.jump_url})", inline=False)
+
+                    await log_channel.send(embed=embed)
+                    print("[DEBUG] Report successfully logged with embed.")
+                else:
+                    print(f"[ERROR] Log channel with ID {log_channel_id} not found.")
+
+                # Send confirmation
+                await user.send("✅ **Thank you for your report!**\nOur moderation team will review it shortly.")
+                print(f"[DEBUG] Report completed for {user.display_name}")
+
+            except asyncio.TimeoutError:
+                await user.send("⏰ **Report timed out.**\nYou took too long to respond. Please try again if needed.")
+                print(f"[DEBUG] Report timed out for {user.display_name}")
+
+        except discord.Forbidden:
+            # User has DMs disabled
+            try:
+                await channel.send(
+                    f"{user.mention}, I cannot send you a direct message. "
+                    f"Please enable DMs from server members to use the report feature.",
+                    delete_after=10
+                )
+                print(f"[DEBUG] User {user.display_name} has DMs disabled.")
+            except discord.Forbidden:
+                print(f"[DEBUG] Cannot send message in channel {channel.name}")
+
+        except Exception as e:
+            print(f"[ERROR] Unexpected error in report system: {e}")
+            try:
+                await user.send("❌ **An error occurred while processing your report.**\nPlease contact a moderator directly.")
+            except:
+                pass
+
+# Bot events for debugging
+@bot.event
+async def on_ready():
+    print(f"[INFO] {bot.user} has connected to Discord!")
+    print(f"[INFO] Bot is in {len(bot.guilds)} guilds")
+
+@bot.event  
+async def on_guild_join(guild):
+    print(f"[INFO] Joined guild: {guild.name} (ID: {guild.id})")
+
+@bot.event
+async def on_command_error(ctx, error):
+    print(f"[ERROR] Command error: {error}")
+
+# Load the cog
 async def setup(bot):
     await bot.add_cog(ReportSystem(bot))
