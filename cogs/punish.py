@@ -41,7 +41,7 @@ class Punishments(commands.Cog):
         total_points = db.add_punishment(ctx.guild.id, member.id, reason, points)
         duration = MutePointSystem.DURATIONS.get(points)
 
-        yellow_card_role = discord.utils.get(ctx.guild.roles, name="·˚ YELLOW CARD")
+        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
 
         if duration:
             try:
