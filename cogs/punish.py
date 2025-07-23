@@ -54,7 +54,7 @@ class Punishments(commands.Cog):
     @commands.command(name="release")
     @commands.has_permissions(manage_messages=True)
     async def release(self, ctx, member: discord.Member):
-        yellow_card_role = discord.utils.get(ctx.guild.roles, name="·˚ YELLOW CARD")
+        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
 
         try:
             await member.timeout(None, reason="Manual unmute by moderator.")
