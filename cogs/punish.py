@@ -35,9 +35,9 @@ class Punishments(commands.Cog):
             await log_channel.send(embed=embed)
 
     async def trigger_ban_vote(self, ctx, member):
-        mod_channel_id = 123456789012345678  # Replace with your actual mod channel ID
+        mod_channel_id =  771072621595983893
         mod_channel = ctx.guild.get_channel(mod_channel_id)
-        mod_roles_ping = "@Ref @Assistant Ref @Club Director"  # Change if needed
+        mod_roles_ping = "@୧ : ASSISTANT REFREE ᐟ⋆ @୧ :REFEREE ᐟ⋆ @୧ : CLUB DIRECTOR ᐟ⋆"  
 
         if mod_channel:
             embed = discord.Embed(
