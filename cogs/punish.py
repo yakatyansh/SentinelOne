@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import discord
 from discord.ext import commands
 from utils import db
@@ -34,6 +34,45 @@ class Punishments(commands.Cog):
             embed.add_field(name="Timeout Duration", value=MutePointSystem.format_duration(duration) if duration else "N/A", inline=True)
             await log_channel.send(embed=embed)
 
+    async def trigger_ban_vote(self, ctx, member):
+        mod_channel_id = 123456789012345678  # Replace with your actual mod channel ID
+        mod_channel = ctx.guild.get_channel(mod_channel_id)
+        mod_roles_ping = "@Ref @Assistant Ref @Club Director"  # Change if needed
+
+        if mod_channel:
+            embed = discord.Embed(
+                title="🚨 Ban Vote Triggered",
+                description=f"{mod_roles_ping}\n{member.mention} has reached **10 MP**. Vote to ban this user.",
+                color=discord.Color.red(),
+                timestamp=datetime.utcnow()
+            )
+            message = await mod_channel.send(embed=embed)
+            await message.add_reaction("✅")  # Tick
+            await message.add_reaction("❌")  # Cross
+
+            def check(reaction, user):
+                return (
+                    reaction.message.id == message.id
+                    and str(reaction.emoji) in ["\u2705", "\u274c"]
+                    and not user.bot
+                )
+
+            await discord.utils.sleep_until(datetime.utcnow() + timedelta(seconds=120))
+            message = await mod_channel.fetch_message(message.id)
+
+            ticks = sum(1 for r in message.reactions if str(r.emoji) == "✅" for _ in await r.users().flatten() if not _.bot)
+            crosses = sum(1 for r in message.reactions if str(r.emoji) == "❌" for _ in await r.users().flatten() if not _.bot)
+
+            if ticks > crosses:
+                try:
+                    await member.ban(reason="Reached 10 Mute Points - Voted Ban")
+                    await mod_channel.send(f"🔨 {member.mention} has been **banned** following a successful vote.")
+                except:
+                    await mod_channel.send(f"❌ Failed to ban {member.mention}. Please check permissions.")
+            else:
+                await mod_channel.send(f"✅ {member.mention} has been **spared**. Vote did not pass.")
+        
+
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def punish(self, ctx, member: discord.Member, *, reason):
@@ -58,6 +97,7 @@ class Punishments(commands.Cog):
                 await ctx.send(f"⚠️ Failed to mute or assign role: {e}")
         else:
             await ctx.send(f"🚨 **Ban vote triggered for {member.mention}** (10 MP reached).")
+            await self.trigger_ban_vote(ctx, member)
 
         # Send DM
         try:
