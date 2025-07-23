@@ -87,7 +87,7 @@ python bot.py
 
 ## 💬 Contribution
 
-PRs and suggestions are welcome! This bot is a WIP and designed specifically for **Mark Roney's community** but feel free to adapt and extend it.
+PRs and suggestions are welcome! This bot is a WIP and designed specifically for **Markaroni's community** but feel free to adapt and extend it.
 
 ---
 
