@@ -1,7 +1,9 @@
+from datetime import datetime
 import discord
 from discord.ext import commands
 from utils import db
 from utils.mutepoint import MutePointSystem
+
 
 intents = discord.Intents.default()
 intents.members = True
@@ -13,6 +15,24 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class Punishments(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+   
+
+    async def log_punishment(self, ctx, target_user, reason, mp_given, duration):
+        log_channel_id = 771065948764372996
+        log_channel = ctx.guild.get_channel(log_channel_id)
+        if log_channel:
+            embed = discord.Embed(
+                title="🔨 Punishment Issued",
+                color=discord.Color.orange(),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Punished User", value=target_user.mention, inline=True)
+            embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+            embed.add_field(name="Reason", value=reason, inline=False)
+            embed.add_field(name="Mute Points Given", value=str(mp_given), inline=True)
+            embed.add_field(name="Timeout Duration", value=MutePointSystem.format_duration(duration) if duration else "N/A", inline=True)
+            await log_channel.send(embed=embed)
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -48,8 +68,8 @@ class Punishments(commands.Cog):
             )
         except:
             await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
-
         await ctx.send(f"✅ {member.mention} punished for **{reason}**. Added **{points} MP**. Total: **{total_points} MP**.")
+        await self.log_punishment(ctx, member, reason, points, duration)
 
     @commands.command(name="release")
     @commands.has_permissions(manage_messages=True)
@@ -73,7 +93,7 @@ class Punishments(commands.Cog):
                 f"You have been unmuted in **{ctx.guild.name}** by a moderator."
             )
         except:
-            await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
+            await ctx.send(f"⚠️ Could not send DM to {member.mention}.")        
 
 async def setup(bot):
     await bot.add_cog(Punishments(bot))
