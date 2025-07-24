@@ -47,8 +47,8 @@ class Punishments(commands.Cog):
                 timestamp=datetime.utcnow()
             )
             message = await mod_channel.send(embed=embed)
-            await message.add_reaction("✅")  # Tick
-            await message.add_reaction("❌")  # Cross
+            await message.add_reaction("✅")  
+            await message.add_reaction("❌")
 
             def check(reaction, user):
                 return (

@@ -3,16 +3,16 @@ from typing import Optional
 
 class MutePointSystem:
     OFFENSES = {
-        1: ['spam', 'unnecessary', 'flooding'],
-        2: ['toxic', 'passive aggressive', 'baiting'],
-        3: ['repeated', 'drama', 'filter bypass'],
-        4: ['harassment', 'personal attack'],
-        5: ['hate speech', 'slur', 'nsfw'],
-        6: ['trolling', 'disruption'],
-        7: ['extreme disrespect', 'targeting staff'],
-        8: ['multiple offenses', 'serious violation'],
-        9: ['final warning', 'major offense'],
-        10: ['raid', 'doxx', 'threat', 'impersonation']
+        1: ['Light spam', 'Mild trolling', 'Using caps unnecessarily', 'Off-topic messages'],
+        2: ['Repeated spam', 'Ignoring staff pings', 'Mini-modding', 'Borderline toxic language'],
+        3: ['Excessive trolling', 'Minor toxicity', 'Arguing with staff', 'Spam pings', 'Baiting drama'],
+        4: ['Swearing at members', 'Harassment warnings', 'Disturbing messages', 'Repeated disruption'],
+        5: ['Light hate speech', 'Mass ping (once)', 'Evading mutes', 'NSFW language'],
+        6: ['Offensive memes', 'Provoking fights', 'Toxic DMs to members', 'Ignoring multiple warnings'],
+        7: ['Targeted harassment', 'Repeated bigotry', 'Serious raid baiting', 'Impersonation'],
+        8: ['Consistent toxic behavior', 'Use of hate symbols', 'NSFW content', 'Threatening tone in arguments'],
+        9: ['Staff disrespect', 'Malicious intent', 'Spamming harmful links', 'Calling for raids'],
+        10: ['Severe/ongoing disruption', 'Zero improvement', 'Server risk', 'Ban vote triggered']
     }
 
     DURATIONS = {
