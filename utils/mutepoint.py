@@ -16,7 +16,6 @@ class MutePointSystem:
     }
 
     DURATIONS = {
-        0: timedelta(minutes=5),
         1: timedelta(minutes=20),
         2: timedelta(hours=1),
         3: timedelta(hours=3),
