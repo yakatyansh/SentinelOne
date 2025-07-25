@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from asyncio import sleep
 import discord
 from discord.ext import commands
 from utils import db
@@ -15,8 +16,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class Punishments(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
-   
+        self.active_timeouts = {}  # Track active timeouts
 
     async def log_punishment(self, ctx, target_user, reason, mp_given, duration):
         log_channel_id = 771065948764372996
@@ -73,6 +73,22 @@ class Punishments(commands.Cog):
                 await mod_channel.send(f"✅ {member.mention} has been **spared**. Vote did not pass.")
         
 
+    async def remove_yellow_card_after_timeout(self, member: discord.Member, duration: int):
+        try:
+            await sleep(duration)
+            
+            guild = member.guild
+            member = guild.get_member(member.id)
+            if not member:
+                return
+                
+            yellow_card_role = discord.utils.get(guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+            if yellow_card_role and yellow_card_role in member.roles:
+                await member.remove_roles(yellow_card_role, reason="Timeout duration expired")
+                    
+        except Exception as e:
+            print(f"[ERROR] Failed to remove yellow card role: {e}")
+
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def punish(self, ctx, member: discord.Member, *, reason):
@@ -89,6 +105,12 @@ class Punishments(commands.Cog):
 
                 if yellow_card_role:
                     await member.add_roles(yellow_card_role, reason="Mute issued by bot")
+                    self.bot.loop.create_task(
+                        self.remove_yellow_card_after_timeout(
+                            member, 
+                            int(duration.total_seconds())
+                        )
+                    )
                 else:
                     await ctx.send("⚠️ Could not find the 'Yellow Card' role. Please make sure it exists.")
             except discord.Forbidden:
@@ -109,6 +131,7 @@ class Punishments(commands.Cog):
         except:
             await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
         await ctx.send(f"✅ {member.mention} punished for **{reason}**. Added **{points} MP**. Total: **{total_points} MP**.")
+
         await self.log_punishment(ctx, member, reason, points, duration)
 
     @commands.command(name="release")
