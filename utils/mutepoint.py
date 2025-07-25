@@ -35,7 +35,7 @@ class MutePointSystem:
             for keyword in cls.OFFENSES[points]:
                 if keyword in reason:
                     return points
-        return 0  # default if nothing matches
+        return 1  # default if nothing matches
 
     @classmethod
     def get_duration(cls, total_points: int) -> Optional[timedelta]:
