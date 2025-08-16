@@ -86,7 +86,7 @@ class ReportSystem(commands.Cog):
                 print(f"[DEBUG] Received response: {response.content[:50]}...")
 
                 # Send to log channel
-                log_channel_id = 771065948764372996  # Replace with your actual log channel ID
+                log_channel_id = 1395499760676376577 
                 log_channel = guild.get_channel(log_channel_id)
                 
                 if log_channel:

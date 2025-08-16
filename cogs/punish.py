@@ -19,7 +19,7 @@ class Punishments(commands.Cog):
         self.active_timeouts = {}  # Track active timeouts
 
     async def log_punishment(self, ctx, target_user, reason, mp_given, duration):
-        log_channel_id = 771065948764372996
+        log_channel_id = 1395499760676376577
         log_channel = ctx.guild.get_channel(log_channel_id)
         if log_channel:
             embed = discord.Embed(
