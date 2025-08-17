@@ -3,107 +3,118 @@ from typing import Optional, Dict, List, Tuple
 from enum import Enum
 
 class OffenseLevel(Enum):
-    ADVISORY = "Advisory"
-    NOTICE = "Notice"
-    WARNING = "Warning"
-    PENALTY = "Penalty"
-    SUSPENSION = "Suspension"
-    EXPULSION = "Expulsion"
+    ADVISORY = "⚪ Advisory"
+    NOTICE = "🟢 Notice"
+    WARNING = "🟡 Warning"
+    PENALTY = "🟠 Penalty"
+    SUSPENSION = "🟠 Suspension"
+    EXPULSION = "🔴 Expulsion"
 
 class MutePointSystem:
-    OFFENSE_CATEGORIES: Dict[OffenseLevel, Dict[str, Tuple[int, List[str]]]] = {
-        OffenseLevel.ADVISORY: {
-            "Minor Disruption": (0, ["spam", "wrong channel", "bot misuse"]),
-            "Self Promotion": (0, ["self-promo", "advertising"]),
-            "Chat Etiquette": (0, ["caps", "sticker spam", "emoji spam", "gif spam", "weird gif"]),
-            "Bold Text": (0, ["bold text", "text formatting"])
+    OFFENSE_CATEGORIES: Dict[str, Dict[str, List[str]]] = {
+        "advisory": {
+            "spam": ["minor spam", "wrong channel", "bot misuse"],
+            "formatting": ["bold text", "caps"],
+            "media": ["sticker spam", "emoji spam", "gif spam", "weird gif"],
+            "promotion": ["self-promo"]
         },
-        OffenseLevel.NOTICE: {
-            "Offensive Language": (1, ["offensive", "toxic", "bait"]),
-            "Mass Ping": (1, ["mass ping", "mass mention"]),
-            "Light Toxicity": (1, ["light toxic", "baiting"]),
-            "Tickets": (1, ["ticket abuse", "unnecessary ticket"]),
-            "Mild Disrespect": (1, ["mild disrespect", "attitude"])
+        "notice": {
+            "language": ["offensive", "toxicity", "disrespect"],
+            "disruption": ["mass ping", "ticket abuse", "baiting"]
         },
-        OffenseLevel.WARNING: {
-            "Repeated Spam": (2, ["repeated spam", "continued disruption"]),
-            "Trolling": (2, ["troll", "provoke"]),
-            "Mod Defiance": (2, ["ignore mod", "mod instruction"])
+        "warning": {
+            "repeat": ["repeated spam", "trolling"],
+            "behavior": ["provoking", "ignore mod"]
         },
-        OffenseLevel.PENALTY: {
-            "Political Content": (3, ["political", "regional"]),
-            "Aggressive Trolling": (3, ["aggressive troll", "disruption"]),
-            "Targeted Harassment": (3, ["targeted", "harass"])
+        "penalty": {
+            "serious": ["political", "regional", "racism", "stereotype"],
+            "harassment": ["aggressive trolling", "targeted"]
         },
-        OffenseLevel.SUSPENSION: {
-            "Family Arguments": (4, ["family", "involving family"]),
-            "Staff Disrespect": (4, ["staff disrespect", "extreme disrespect"]),
-            "Repeated Harassment": (4, ["repeated harass", "continued harassment"])
+        "suspension": {
+            "severe": ["family", "staff disrespect", "repeated harassment"]
         },
-        OffenseLevel.EXPULSION: {
-            "Serious Targeting": (5, ["serious targeting", "family targeting"]),
-            "Hate Speech": (5, ["hate speech", "slur"]),
-            "NSFW Content": (5, ["nsfw", "explicit"]),
-            "Security Threat": (5, ["raid", "doxx", "threat", "impersonation"])
+        "expulsion": {
+            "critical": ["targeting", "hate speech", "slur", "nsfw", "raid", "doxx", "threat", "impersonation"]
         }
     }
 
-    # Updated durations based on MP count
+    # Points for each category
+    POINTS = {
+        "advisory": 0,  # Starts at 0, increases with warnings
+        "notice": 1,
+        "warning": 2,
+        "penalty": 3,
+        "suspension": 4,
+        "expulsion": 5
+    }
+
+    # Durations for different point levels
     DURATIONS = {
-        1: timedelta(minutes=15),     # 1 MP = 15min
-        2: timedelta(minutes=40),     # 2 MP = 40min
-        3: timedelta(hours=2),        # 3 MP = 2hr
-        4: timedelta(hours=6),        # 4 MP = 6hr
-        5: timedelta(hours=24),       # 5 MP = 24hr
+        0: timedelta(minutes=5),    # Advisory second warning
+        1: timedelta(minutes=15),   # Notice/Third advisory
+        2: timedelta(minutes=40),   # Warning
+        3: timedelta(hours=2),      # Penalty
+        4: timedelta(hours=6),      # Suspension
+        5: timedelta(hours=24)      # Expulsion
     }
 
-    # Thresholds for accumulated MPs
+    # MP Thresholds
     MP_THRESHOLDS = {
-        5: timedelta(days=1),         # 5 MP → 1-day mute
-        8: timedelta(days=3),         # 8 MP → 3-day mute
-        10: timedelta(days=7),        # 10 MP → 7-day mute
-        15: None                      # 15 MP → Permanent mute/ban
+        5: timedelta(days=1),       # 5 MP → 1-day mute
+        8: timedelta(days=3),       # 8 MP → 3-day mute
+        10: timedelta(days=7),      # 10 MP → 7-day mute
+        15: None                    # 15 MP → Permanent mute/ban
     }
 
     @classmethod
-    def get_advisory_action(cls, warnings: int) -> Tuple[str, Optional[timedelta]]:
-        """
-        Determine action for advisory offenses based on warning count
-        Returns: (action_type, duration)
-        """
-        if warnings == 0:
-            return "warning", None
-        elif warnings == 1:
-            return "mute", timedelta(minutes=5)
-        else:  # 3rd warning
-            return "mp", timedelta(minutes=15)  # Converts to 1 MP
+    def get_offense_category(cls, reason: str) -> Optional[str]:
+        """Get the category for a given reason."""
+        reason_lower = reason.lower()
+        for category, subcategories in cls.OFFENSE_CATEGORIES.items():
+            for _, keywords in subcategories.items():
+                if any(keyword in reason_lower for keyword in keywords):
+                    return category
+        return None
 
     @classmethod
-    def get_points(cls, offense_type: str, warnings: int = 0) -> int:
-        """Get points based on offense type and warning count"""
-        if offense_type.lower() == "advisory":
-            return 1 if warnings >= 2 else 0
-            
-        for level in OffenseLevel:
-            if level.value.lower() in offense_type.lower():
-                base_points = list(cls.OFFENSE_CATEGORIES[level].values())[0][0]
-                return base_points
-                
-        return 0
+    def get_points(cls, reason: str, warning_count: int = 0) -> int:
+        """Get points for an offense, considering warning count for advisory."""
+        category = cls.get_offense_category(reason)
+        if not category:
+            return 0
+
+        if category == "advisory":
+            if warning_count == 0:
+                return 0  # First warning
+            elif warning_count == 1:
+                return 0  # Second warning (5 min mute)
+            else:
+                return 1  # Third warning converts to 1 MP
+        
+        return cls.POINTS.get(category, 0)
 
     @classmethod
-    def get_duration(cls, total_points: int) -> Optional[timedelta]:
-        """Get mute duration based on total points"""
-        # Check MP thresholds first
-        for threshold, duration in sorted(cls.MP_THRESHOLDS.items(), reverse=True):
+    def get_duration(cls, total_points: int, warning_count: int = 0) -> Optional[timedelta]:
+        """Get mute duration based on total points and warning count."""
+        # Check for permanent mute threshold
+        if total_points >= 15:
+            return None
+
+        # Check MP thresholds
+        for threshold, duration in sorted(cls.MP_THRESHOLDS.items()):
             if total_points >= threshold:
                 return duration
 
-        # If below thresholds, use regular durations
+        # Handle advisory warnings
+        if total_points == 0 and warning_count == 1:
+            return timedelta(minutes=5)  # Second warning
+
+        # Regular durations
         return cls.DURATIONS.get(total_points, timedelta(minutes=5))
 
     @classmethod
     def format_duration(cls, duration: Optional[timedelta]) -> str:
+        """Format duration into a human-readable string."""
         if duration is None:
             return "Permanent Mute/Ban"
         
@@ -117,18 +128,3 @@ class MutePointSystem:
         else:
             days = total_minutes / 1440
             return f"{days:.1f} days"
-
-    @classmethod
-    def get_offense_info(cls, offense_type: str, warnings: int = 0) -> Tuple[OffenseLevel, str, int]:
-        """Get detailed information about an offense"""
-        if offense_type.lower() == "advisory":
-            action, _ = cls.get_advisory_action(warnings)
-            if action == "mp":
-                return OffenseLevel.NOTICE, "Repeated Advisory", 1
-            return OffenseLevel.ADVISORY, f"Advisory Warning #{warnings + 1}", 0
-            
-        for level in OffenseLevel:
-            if level.value.lower() in offense_type.lower():
-                return level, level.value, cls.get_points(offense_type)
-                    
-        return OffenseLevel.ADVISORY, "Unknown", 0

@@ -85,8 +85,7 @@ class ReportSystem(commands.Cog):
                 response = await self.bot.wait_for('message', check=check, timeout=60.0)
                 print(f"[DEBUG] Received response: {response.content[:50]}...")
 
-                # Send to log channel
-                log_channel_id = 1395499760676376577 
+                log_channel_id = 1406574258573803661
                 log_channel = guild.get_channel(log_channel_id)
                 
                 if log_channel:
@@ -116,7 +115,6 @@ class ReportSystem(commands.Cog):
                 print(f"[DEBUG] Report timed out for {user.display_name}")
 
         except discord.Forbidden:
-            # User has DMs disabled
             try:
                 await channel.send(
                     f"{user.mention}, I cannot send you a direct message. "
@@ -133,20 +131,6 @@ class ReportSystem(commands.Cog):
                 await user.send("❌ **An error occurred while processing your report.**\nPlease contact a moderator directly.")
             except:
                 pass
-
-# Bot events for debugging
-@bot.event
-async def on_ready():
-    print(f"[INFO] {bot.user} has connected to Discord!")
-    print(f"[INFO] Bot is in {len(bot.guilds)} guilds")
-
-@bot.event  
-async def on_guild_join(guild):
-    print(f"[INFO] Joined guild: {guild.name} (ID: {guild.id})")
-
-@bot.event
-async def on_command_error(ctx, error):
-    print(f"[ERROR] Command error: {error}")
 
 # Load the cog
 async def setup(bot):

@@ -1,8 +1,8 @@
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from dotenv import load_dotenv
-from datetime import datetime
-from typing import Optional, Dict, List
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Tuple
 
 load_dotenv()
 
@@ -10,47 +10,15 @@ MONGO_URI = os.getenv('MONGODB_URI')
 if not MONGO_URI:
     raise ValueError("No MONGODB_URI found in environment variables.")
 
-client = MongoClient(MONGO_URI)
+client = AsyncIOMotorClient(MONGO_URI)
 db = client["SentinelOne"]
 users_collection = db["Users"]
 
-def add_punishment(guild_id: int, user_id: int, reason: str, points: int) -> int:
-    user_data = users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
-    new_entry = {
-        "reason": reason,
-        "points": points,
-        "timestamp": datetime.utcnow()
-    }
-
-    if user_data:
-        users_collection.update_one(
-            {"guild_id": guild_id, "user_id": user_id},
-            {
-                "$inc": {"total_points": points},
-                "$push": {"punishments": new_entry}
-            }
-        )
-        return user_data["total_points"] + points
-    else:
-        users_collection.insert_one({
-            "guild_id": guild_id,
-            "user_id": user_id,
-            "total_points": points,
-            "punishments": [new_entry]
-        })
-        return points
-
-def clear_points(guild_id, user_id):
-    users_collection.delete_one({"guild_id": guild_id, "user_id": user_id})
-
-def get_points(guild_id, user_id):
-    user = users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
-    return user["total_points"] if user else 0
-
-def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional[str] = None) -> int:
+async def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional[str] = None) -> Tuple[int, bool]:
     """
     Add a warning to a user's record
-    Returns: Number of current warnings
+    Returns: (warning_count, is_mutable)
+    is_mutable indicates if the warning should result in a mute
     """
     warning = {
         "timestamp": datetime.utcnow(),
@@ -58,7 +26,7 @@ def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional[str] 
         "reason": reason
     }
     
-    result = users_collection.update_one(
+    await users_collection.update_one(
         {"guild_id": guild_id, "user_id": user_id},
         {
             "$push": {"warnings": warning},
@@ -67,73 +35,47 @@ def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional[str] 
         upsert=True
     )
     
-    user_data = users_collection.find_one(
+    user_data = await users_collection.find_one(
         {"guild_id": guild_id, "user_id": user_id}
     )
-    return len(user_data.get("warnings", []))
+    warning_count = len(user_data.get("warnings", []))
+    
+    # Second warning gets 5min mute, third warning converts to 1MP
+    return warning_count, warning_count in [2, 3]
 
-def get_warnings(guild_id: int, user_id: int) -> List[Dict]:
-    """Get all warnings for a user"""
-    user_data = users_collection.find_one(
-        {"guild_id": guild_id, "user_id": user_id},
-        {"warnings": 1}
-    )
-    return user_data.get("warnings", []) if user_data else []
-
-def get_warning_count(guild_id: int, user_id: int) -> int:
-    """Get number of warnings for a user"""
-    warnings = get_warnings(guild_id, user_id)
-    return len(warnings)
-
-def clear_warnings(guild_id: int, user_id: int) -> bool:
-    """
-    Clear all warnings for a user
-    Returns: True if warnings were cleared, False if user not found
-    """
-    result = users_collection.update_one(
-        {"guild_id": guild_id, "user_id": user_id},
-        {"$set": {"warnings": []}}
-    )
-    return result.modified_count > 0
-
-def get_user_info(guild_id: int, user_id: int) -> Optional[Dict]:
-    """Get all user information including warnings and punishments"""
-    return users_collection.find_one(
-        {"guild_id": guild_id, "user_id": user_id}
-    )
-
-# Modify existing add_punishment to handle warning conversion
-def add_punishment(guild_id: int, user_id: int, reason: str, points: int, mod_id: Optional[int] = None) -> int:
-    user_data = users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
+async def add_punishment(guild_id: int, user_id: int, reason: str, points: int, warning_count: int = 0) -> int:
+    """Add punishment to the database and update total points."""
+    user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
     new_entry = {
         "reason": reason,
         "points": points,
         "timestamp": datetime.utcnow(),
-        "mod_id": mod_id
+        "warning_count": warning_count
     }
 
     if user_data:
-        # Clear warnings if converting to MP
-        if "warning_conversion" in reason.lower():
-            users_collection.update_one(
+        # Handle third warning conversion to MP
+        if warning_count >= 3:
+            await users_collection.update_one(
                 {"guild_id": guild_id, "user_id": user_id},
                 {
-                    "$inc": {"total_points": points},
+                    "$inc": {"total_points": 1},  # Add 1 MP for third warning
                     "$push": {"punishments": new_entry},
-                    "$set": {"warnings": []}
+                    "$set": {"warnings": []}  # Clear warnings after conversion
                 }
             )
+            return user_data["total_points"] + 1
         else:
-            users_collection.update_one(
+            await users_collection.update_one(
                 {"guild_id": guild_id, "user_id": user_id},
                 {
                     "$inc": {"total_points": points},
                     "$push": {"punishments": new_entry}
                 }
             )
-        return user_data["total_points"] + points
+            return user_data["total_points"] + points
     else:
-        users_collection.insert_one({
+        await users_collection.insert_one({
             "guild_id": guild_id,
             "user_id": user_id,
             "total_points": points,
@@ -141,3 +83,73 @@ def add_punishment(guild_id: int, user_id: int, reason: str, points: int, mod_id
             "warnings": []
         })
         return points
+
+async def get_warnings(guild_id: int, user_id: int) -> List[Dict]:
+    """Get all warnings for a user"""
+    user_data = await users_collection.find_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {"warnings": 1}
+    )
+    return user_data.get("warnings", []) if user_data else []
+
+async def get_warning_count(guild_id: int, user_id: int) -> int:
+    """Get number of warnings for a user"""
+    warnings = await get_warnings(guild_id, user_id)
+    return len(warnings)
+
+async def clear_warnings(guild_id: int, user_id: int) -> bool:
+    """Clear all warnings for a user"""
+    result = await users_collection.update_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {"$set": {"warnings": []}}
+    )
+    return result.modified_count > 0
+
+async def get_user_info(guild_id: int, user_id: int) -> Optional[Dict]:
+    """Get all user information including warnings and punishments"""
+    return await users_collection.find_one(
+        {"guild_id": guild_id, "user_id": user_id}
+    )
+
+async def clear_points(guild_id: int, user_id: int) -> bool:
+    """Clear all points and warnings for a user"""
+    result = await users_collection.update_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {
+            "$set": {
+                "total_points": 0,
+                "warnings": [],
+                "punishments": []
+            }
+        }
+    )
+    return result.modified_count > 0
+
+async def check_expired_points(guild_id: int, user_id: int) -> int:
+    """Remove expired points (older than 20 days) and return new total"""
+    expiry_date = datetime.utcnow() - timedelta(days=20)
+    
+    user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
+    if not user_data:
+        return 0
+
+    active_punishments = []
+    total_points = 0
+    
+    for punishment in user_data.get('punishments', []):
+        if punishment['timestamp'] > expiry_date:
+            active_punishments.append(punishment)
+            total_points += punishment['points']
+
+    # Update database with only active punishments
+    await users_collection.update_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {
+            "$set": {
+                "punishments": active_punishments,
+                "total_points": total_points
+            }
+        }
+    )
+    
+    return total_points
