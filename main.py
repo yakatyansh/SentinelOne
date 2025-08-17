@@ -11,8 +11,7 @@ TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 if not TOKEN:
     raise ValueError("No DISCORD_BOT_TOKEN found in environment variables.")
 
-keep_alive()
-
+keep_alive()  # start flask thread
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -38,8 +37,7 @@ async def load_extensions():
 
 async def main():
     await load_extensions()
-    await asyncio.gather(
-        bot.start(TOKEN),
-    )
+    await bot.start(TOKEN)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
