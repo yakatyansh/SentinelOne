@@ -116,15 +116,28 @@ class Punishments(commands.Cog):
 
     async def remove_yellow_card_after_timeout(self, member: discord.Member, duration: int):
         try:
-            await sleep(duration)
-            guild = member.guild
-            member = guild.get_member(member.id)
-            if not member:
-                return
-
-            yellow_card_role = discord.utils.get(guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
-            if yellow_card_role and yellow_card_role in member.roles:
-                await member.remove_roles(yellow_card_role, reason="Timeout duration expired")
+            end_time = datetime.utcnow() + timedelta(seconds=duration)
+            
+            while datetime.utcnow() < end_time:
+                remaining = (end_time - datetime.utcnow()).total_seconds()
+                
+                if remaining <= 300:
+                    await sleep(min(remaining, 60)) 
+                else:
+                    await sleep(3600)  
+                
+                guild = member.guild
+                member = guild.get_member(member.id)
+                
+                if not member:
+                    return
+                
+                if not member.timed_out:
+                    yellow_card_role = discord.utils.get(guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+                    if yellow_card_role and yellow_card_role in member.roles:
+                        await member.remove_roles(yellow_card_role, reason="Timeout duration expired")
+                    return
+                    
         except Exception as e:
             print(f"[ERROR] Failed to remove yellow card role: {e}")
 
