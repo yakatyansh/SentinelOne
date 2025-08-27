@@ -141,7 +141,6 @@ class Points(commands.Cog):
             await ctx.send(f"❌ Error clearing points: {str(e)}")
 
     @commands.command(name="senti")
-    @commands.has_permissions(manage_messages=True)
     async def help(self, ctx):
         """Display help information for the points system"""
         embed = discord.Embed(
