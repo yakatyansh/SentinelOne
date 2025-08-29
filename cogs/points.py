@@ -9,7 +9,6 @@ class Points(commands.Cog):
         self.bot = bot
 
     @commands.command(name="points")
-    @commands.has_permissions(manage_messages=True)
     async def points(self, ctx, member: discord.Member):
         """Get detailed points and warnings information for a member"""
         # Check for expired points first
@@ -141,6 +140,7 @@ class Points(commands.Cog):
             await ctx.send(f"❌ Error clearing points: {str(e)}")
 
     @commands.command(name="senti")
+    @commands.has_permissions(manage_messages=True)
     async def help(self, ctx):
         """Display help information for the points system"""
         embed = discord.Embed(
@@ -204,7 +204,6 @@ class Points(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="expires")
-    @commands.has_permissions(manage_messages=True)
     async def expires(self, ctx, member: discord.Member):
         """View when points will expire for a user"""
         user_info = await db.get_user_info(ctx.guild.id, member.id)
