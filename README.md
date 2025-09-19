@@ -34,8 +34,8 @@ A custom-built moderation and utility bot tailored for the **Markaroni YouTube C
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mark-roney-discord-bot.git
-cd mark-roney-discord-bot
+git clone https://github.com/YOUR_USERNAME/SentinelOne.git
+cd SentinelOne
 pip install -r requirements.txt
 ```
 
@@ -96,3 +96,4 @@ PRs and suggestions are welcome! This bot is a WIP and designed specifically for
 ## 📄 License
 
 MIT License – feel free to use, modify, and share.
+
