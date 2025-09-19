@@ -246,53 +246,37 @@ class Points(commands.Cog):
                 return
 
             user_info = await db.get_user_info(ctx.guild.id, member.id)
-            current_points = user_info.get("total_points", 0) if user_info else 0
-
-            if current_points == 0:
+            if not user_info or user_info.get("total_points", 0) == 0:
                 await ctx.send(f"❌ {member.mention} has no points to deduct.")
                 return
 
-            if points > current_points:
-                points = current_points  # Prevent deducting more than available
+            current_points = user_info["total_points"]
+            points_to_deduct = min(points, current_points)  # Don't deduct more than available
+            new_points = await db.deductpoints(ctx.guild.id, member.id, points_to_deduct)
 
-            new_points = await db.deductpoints(ctx.guild.id, member.id, points)
-
-            deduction_entry = {
-                "reason": "Point Deduction",
-                "points": -points, 
-                "timestamp": datetime.utcnow()
-            }
-
-
-            await db.users_collection.update_one(
-                {"guild_id": ctx.guild.id, "user_id": member.id},
-                {"$push": {"punishments": deduction_entry}}
-            )
-
-            # Create embed for deduction notification
             embed = discord.Embed(
                 title="Points Deducted",
                 color=discord.Color.green(),
                 timestamp=ctx.message.created_at
             )
             embed.add_field(name="User", value=member.mention, inline=True)
-            embed.add_field(name="Deducted", value=f"{points} MP", inline=True)
+            embed.add_field(name="Deducted", value=f"{points_to_deduct} MP", inline=True)
             embed.add_field(name="New Total", value=f"{new_points} MP", inline=True)
             embed.set_footer(text=f"Deducted by {ctx.author.name}")
 
             await ctx.send(embed=embed)
 
-            # Try to DM the user
             try:
                 await member.send(
-                    f"**{points} MP** have been deducted from your record in {ctx.guild.name}.\n"
+                    f"**{points_to_deduct} MP** have been deducted from your record in {ctx.guild.name}.\n"
                     f"Current total: **{new_points} MP**"
                 )
             except:
                 pass  # Ignore if DM fails
 
         except Exception as e:
-            await ctx.send(f"❌ Error deducting points: {str(e)}")
+            await ctx.send(f"❌ Error: {str(e)}")
+            raise  # Re-raise for logging purposes
         
 async def setup(bot):
     await bot.add_cog(Points(bot))

@@ -154,21 +154,18 @@ async def check_expired_points(guild_id: int, user_id: int) -> int:
     
     return total_points
 
-async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> int:
-    """
-    Deduct points from a user's total and return new total
-    Returns the new total points count
-    """
+async def deductpoints(guild_id: int, user_id: int, points: int) -> int:
+
     user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
     if not user_data:
         return 0
-
+    
     current_points = user_data.get('total_points', 0)
-    new_points = max(0, current_points - points_to_deduct)  # Prevent negative points
-
+    new_points = max(0, current_points - points)  # Prevent negative points
+    
     await users_collection.update_one(
         {"guild_id": guild_id, "user_id": user_id},
         {"$set": {"total_points": new_points}}
     )
-
+    
     return new_points
