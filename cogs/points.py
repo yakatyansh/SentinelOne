@@ -235,6 +235,64 @@ class Points(commands.Cog):
             embed.description = "No active punishments."
 
         await ctx.send(embed=embed)
+
+    @commands.command(name="deduct")
+    @commands.has_permissions(administrator=True)
+    async def deduct(self, ctx, member: discord.Member, points: int):
+        """Deduct mute points from a user"""
+        try:
+            if points <= 0:
+                await ctx.send("❌ Points to deduct must be a positive integer.")
+                return
+
+            user_info = await db.get_user_info(ctx.guild.id, member.id)
+            current_points = user_info.get("total_points", 0) if user_info else 0
+
+            if current_points == 0:
+                await ctx.send(f"❌ {member.mention} has no points to deduct.")
+                return
+
+            if points > current_points:
+                points = current_points  # Prevent deducting more than available
+
+            new_points = await db.deductpoints(ctx.guild.id, member.id, points)
+
+            deduction_entry = {
+                "reason": "Point Deduction",
+                "points": -points, 
+                "timestamp": datetime.utcnow()
+            }
+
+
+            await db.users_collection.update_one(
+                {"guild_id": ctx.guild.id, "user_id": member.id},
+                {"$push": {"punishments": deduction_entry}}
+            )
+
+            # Create embed for deduction notification
+            embed = discord.Embed(
+                title="Points Deducted",
+                color=discord.Color.green(),
+                timestamp=ctx.message.created_at
+            )
+            embed.add_field(name="User", value=member.mention, inline=True)
+            embed.add_field(name="Deducted", value=f"{points} MP", inline=True)
+            embed.add_field(name="New Total", value=f"{new_points} MP", inline=True)
+            embed.set_footer(text=f"Deducted by {ctx.author.name}")
+
+            await ctx.send(embed=embed)
+
+            # Try to DM the user
+            try:
+                await member.send(
+                    f"**{points} MP** have been deducted from your record in {ctx.guild.name}.\n"
+                    f"Current total: **{new_points} MP**"
+                )
+            except:
+                pass  # Ignore if DM fails
+
+        except Exception as e:
+            await ctx.send(f"❌ Error deducting points: {str(e)}")
         
 async def setup(bot):
     await bot.add_cog(Points(bot))
