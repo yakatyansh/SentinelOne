@@ -155,17 +155,27 @@ async def check_expired_points(guild_id: int, user_id: int) -> int:
     return total_points
 
 async def deductpoints(guild_id: int, user_id: int, points: int) -> int:
+    """Deduct points from a user atomically and return the new total."""
+    user_data = await users_collection.find_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {"total_points": 1}  # Only fetch the total_points field
+    )
 
-    user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
     if not user_data:
         return 0
-    
+
     current_points = user_data.get('total_points', 0)
-    new_points = max(0, current_points - points)  # Prevent negative points
     
+    # Ensure points don't go below zero
+    points_to_deduct = min(points, current_points)
+    
+    if points_to_deduct <= 0:
+        return current_points
+
+    # Use $inc to atomically decrement the points
     await users_collection.update_one(
         {"guild_id": guild_id, "user_id": user_id},
-        {"$set": {"total_points": new_points}}
+        {"$inc": {"total_points": -points_to_deduct}}
     )
     
-    return new_points
+    return current_points - points_to_deduct
