@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
+from pymongo import ReturnDocument
 
 load_dotenv()
 
@@ -155,27 +156,30 @@ async def check_expired_points(guild_id: int, user_id: int) -> int:
     return total_points
 
 async def deductpoints(guild_id: int, user_id: int, points: int) -> int:
-    """Deduct points from a user atomically and return the new total."""
-    user_data = await users_collection.find_one(
+    """Atomically deducts points from a user and returns their new total."""
+    
+
+    updated_document = await users_collection.find_one_and_update(
         {"guild_id": guild_id, "user_id": user_id},
-        {"total_points": 1}  # Only fetch the total_points field
+        [
+            {
+                "$set": {
+                    "total_points": {
+                        "$max": [
+                            0, 
+                            {"$subtract": ["$total_points", points]}
+                        ]
+                    }
+                }
+            }
+        ],
+        return_document=ReturnDocument.AFTER,
+        upsert=False 
     )
 
-    if not user_data:
+    if updated_document:
+
+        return updated_document.get("total_points", 0)
+    else:
+
         return 0
-
-    current_points = user_data.get('total_points', 0)
-    
-    # Ensure points don't go below zero
-    points_to_deduct = min(points, current_points)
-    
-    if points_to_deduct <= 0:
-        return current_points
-
-    # Use $inc to atomically decrement the points
-    await users_collection.update_one(
-        {"guild_id": guild_id, "user_id": user_id},
-        {"$inc": {"total_points": -points_to_deduct}}
-    )
-    
-    return current_points - points_to_deduct

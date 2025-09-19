@@ -203,39 +203,6 @@ class Points(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(name="expires")
-    async def expires(self, ctx, member: discord.Member):
-        """View when points will expire for a user"""
-        user_info = await db.get_user_info(ctx.guild.id, member.id)
-        
-        if not user_info or not user_info.get('punishments'):
-            await ctx.send(f"{member.mention} has no active punishments.")
-            return
-
-        embed = discord.Embed(
-            title=f"Point Expiration for {member.display_name}",
-            color=discord.Color.blue(),
-            timestamp=ctx.message.created_at
-        )
-
-        active_punishments = []
-        for p in user_info['punishments']:
-            timestamp = p['timestamp']
-            expiry_date = timestamp + timedelta(days=20)
-            remaining_days = (expiry_date - datetime.utcnow()).days
-            
-            if remaining_days > 0:
-                active_punishments.append(
-                    f"• {p['reason']} ({p['points']} MP) - Expires <t:{int(expiry_date.timestamp())}:R>"
-                )
-
-        if active_punishments:
-            embed.description = "\n".join(active_punishments)
-        else:
-            embed.description = "No active punishments."
-
-        await ctx.send(embed=embed)
-
     @commands.command(name="deduct")
     @commands.has_permissions(administrator=True)
     async def deduct(self, ctx, member: discord.Member, points: int):
@@ -246,21 +213,23 @@ class Points(commands.Cog):
                 return
 
             user_info = await db.get_user_info(ctx.guild.id, member.id)
-            if not user_info or user_info.get("total_points", 0) == 0:
+            current_points = user_info.get("total_points", 0) if user_info else 0
+
+            if current_points == 0:
                 await ctx.send(f"❌ {member.mention} has no points to deduct.")
                 return
 
-            current_points = user_info["total_points"]
-            points_to_deduct = min(points, current_points)  # Don't deduct more than available
-            new_points = await db.deductpoints(ctx.guild.id, member.id, points_to_deduct)
+            new_points = await db.deductpoints(ctx.guild.id, member.id, points)
+
+            points_actually_deducted = current_points - new_points
 
             embed = discord.Embed(
-                title="Points Deducted",
+                title="✅ Points Deducted",
                 color=discord.Color.green(),
                 timestamp=ctx.message.created_at
             )
             embed.add_field(name="User", value=member.mention, inline=True)
-            embed.add_field(name="Deducted", value=f"{points_to_deduct} MP", inline=True)
+            embed.add_field(name="Deducted", value=f"{points_actually_deducted} MP", inline=True)
             embed.add_field(name="New Total", value=f"{new_points} MP", inline=True)
             embed.set_footer(text=f"Deducted by {ctx.author.name}")
 
@@ -268,15 +237,15 @@ class Points(commands.Cog):
 
             try:
                 await member.send(
-                    f"**{points_to_deduct} MP** have been deducted from your record in {ctx.guild.name}.\n"
-                    f"Current total: **{new_points} MP**"
+                    f"**{points_actually_deducted} MP** have been deducted from your record in {ctx.guild.name}.\n"
+                    f"Your new total is **{new_points} MP**."
                 )
-            except:
-                pass  # Ignore if DM fails
+            except discord.Forbidden:
+                pass  
 
         except Exception as e:
-            await ctx.send(f"❌ Error: {str(e)}")
-            raise  # Re-raise for logging purposes
-        
+            await ctx.send(f"❌ An unexpected error occurred. Please check the logs.")
+            print(f"Error in !deduct command: {e}") # Log the error to your console
+            
 async def setup(bot):
     await bot.add_cog(Points(bot))
