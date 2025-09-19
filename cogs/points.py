@@ -201,6 +201,14 @@ class Points(commands.Cog):
             inline=False
         )
 
+        embed.add_field(
+            name="🔽 Point Deduction",
+            value="`!deduct @user points` • Deduct MP from user's total",
+            inline=False
+        )
+
+        embed.set_footer(text="Made with ❤️ by Lionel Mausi")
+
         await ctx.send(embed=embed)
 
     @commands.command(name="deduct")
