@@ -155,31 +155,53 @@ async def check_expired_points(guild_id: int, user_id: int) -> int:
     
     return total_points
 
-async def deductpoints(guild_id: int, user_id: int, points: int) -> int:
-    """Atomically deducts points from a user and returns their new total."""
-    
-
-    updated_document = await users_collection.find_one_and_update(
-        {"guild_id": guild_id, "user_id": user_id},
-        [
-            {
-                "$set": {
-                    "total_points": {
-                        "$max": [
-                            0, 
-                            {"$subtract": ["$total_points", points]}
-                        ]
-                    }
-                }
-            }
-        ],
-        return_document=ReturnDocument.AFTER,
-        upsert=False 
+async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> int:
+    """
+    Atomically deducts points from a user by modifying or removing their
+    most recent punishment entries.
+    """
+    user_data = await users_collection.find_one(
+        {"guild_id": guild_id, "user_id": user_id}
     )
 
-    if updated_document:
-
-        return updated_document.get("total_points", 0)
-    else:
+    if not user_data or not user_data.get('punishments'):
 
         return 0
+
+
+    punishments = sorted(user_data.get('punishments', []), key=lambda p: p['timestamp'], reverse=True)
+    
+    remaining_deduction = points_to_deduct
+    updated_punishments = []
+
+    for punishment in punishments:
+        points = punishment.get('points', 0)
+        if remaining_deduction > 0:
+            if points <= remaining_deduction:
+
+                remaining_deduction -= points
+
+            else:
+
+                punishment['points'] -= remaining_deduction
+                remaining_deduction = 0
+                updated_punishments.append(punishment)
+        else:
+            # No more points to deduct, just keep the record as is.
+            updated_punishments.append(punishment)
+
+    updated_punishments.sort(key=lambda p: p['timestamp'])
+
+    new_total_points = sum(p.get('points', 0) for p in updated_punishments)
+
+    await users_collection.update_one(
+        {"guild_id": guild_id, "user_id": user_id},
+        {
+            "$set": {
+                "punishments": updated_punishments,
+                "total_points": new_total_points
+            }
+        }
+    )
+    
+    return new_total_points
