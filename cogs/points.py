@@ -204,7 +204,7 @@ class Points(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="deduct")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_messages=True)
     async def deduct(self, ctx, member: discord.Member, points: int):
         """Deduct mute points from a user"""
         try:
