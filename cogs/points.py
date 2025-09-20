@@ -273,7 +273,7 @@ class Points(commands.Cog):
         )
         
         # An image of a pillory (stocks) to represent public shame.
-        embed.set_thumbnail(url="https://i.imgur.com/uS2dY4M.png")
+        embed.set_thumbnail(url="https://i.pinimg.com/474x/6f/46/01/6f46018cba280f9d00176726fec6585e.jpg")
 
         leaderboard_lines = []
         
