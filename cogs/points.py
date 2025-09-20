@@ -285,7 +285,6 @@ class Points(commands.Cog):
             
             embed.add_field(
                 name=f"{medal} {member.display_name}",
-                value=f"**MP:** {points}\n{'🟥' * min(points, 5)}",
                 inline=False
             )
 
