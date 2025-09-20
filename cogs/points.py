@@ -257,41 +257,29 @@ class Points(commands.Cog):
 
     @commands.command(name="leaderboard")
     async def leaderboard(self, ctx):
-        """Display the points leaderboard for the server"""
-        users = await db.get_all_users(ctx.guild.id)
+        """Display the points leaderboard for the server based on recent activity"""
+        users = await db.get_leaderboard_users(ctx.guild.id) 
+
         if not users:
-            await ctx.send("No users with points found.")
+            await ctx.send("No users with recent points found.")
             return
+        
 
-
-        users.sort(key=db.userleaderboard_key)
 
         embed = discord.Embed(
-            title="🏆 Hall of Shame",
-            description="Top 10 Most Punished Members",
-            color=discord.Color.gold(),
+            title="🤡 Hall of Shame (Last 20 Days)", 
+            color=discord.Color.red(),
             timestamp=ctx.message.created_at
         )
 
-        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-        
+        leaderboard_lines = []
         for idx, user in enumerate(users[:10], start=1):
             member = ctx.guild.get_member(user['user_id'])
-            if not member:
-                continue
-                
+            name = member.display_name if member else f"User ID {user['user_id']}"
             points = user.get('total_points', 0)
-            medal = medals.get(idx, f"#{idx}")
-            
-            embed.add_field(
-                name=f"{medal} {member.display_name}",
-                inline=False
-            )
+            leaderboard_lines.append(f"**{idx}. {name}** - {points} MP")
 
-            if idx == 1:
-                embed.set_thumbnail(url=member.display_avatar.url)
-
-        embed.set_footer(text=f"Total Participants: {len(users)}")
+        embed.description = "\n".join(leaderboard_lines)
         await ctx.send(embed=embed)
             
 async def setup(bot):

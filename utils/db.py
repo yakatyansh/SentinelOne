@@ -206,15 +206,41 @@ async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> in
     
     return new_total_points
 
-async def get_all_users(guild_id: int) -> List[Dict]:
-    """Get all users with more than 0 points for the leaderboard."""
-    # Find all users in the guild who have a total_points value greater than 0.
-    cursor = users_collection.find(
-        {"guild_id": guild_id, "total_points": {"$gt": 0}}
-    )
-    # Convert the query result into a list of user documents and return it.
-    return await cursor.to_list(length=None)
+async def get_leaderboard_users(guild_id: int) -> List[Dict]:
+    """
+    Gets users for the leaderboard, sorted by points accumulated in the last 20 days.
+    """
+    expiry_date = datetime.utcnow() - timedelta(days=20)
+    
 
-def userleaderboard_key(user: Dict) -> Tuple[int, int]:
-    """Key function for sorting users in the leaderboard."""
-    return (-user.get('total_points', 0), user.get('user_id', 0))
+    pipeline = [
+
+        {"$match": {"guild_id": guild_id}},
+        
+
+        {"$unwind": "$punishments"},
+
+        {"$match": {"punishments.timestamp": {"$gte": expiry_date}}},
+        
+
+        {"$group": {
+            "_id": "$user_id",
+            "recent_points": {"$sum": "$punishments.points"}
+        }},
+        
+
+        {"$match": {"recent_points": {"$gt": 0}}},
+        
+
+        {"$sort": {"recent_points": -1}},
+        
+        {"$project": {
+            "user_id": "$_id",
+            "total_points": "$recent_points", 
+            "_id": 0
+        }}
+    ]
+    
+
+    cursor = users_collection.aggregate(pipeline)
+    return await cursor.to_list(length=None)
