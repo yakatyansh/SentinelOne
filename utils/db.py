@@ -206,6 +206,15 @@ async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> in
     
     return new_total_points
 
+async def get_all_users(guild_id: int) -> List[Dict]:
+    """Get all users with more than 0 points for the leaderboard."""
+    # Find all users in the guild who have a total_points value greater than 0.
+    cursor = users_collection.find(
+        {"guild_id": guild_id, "total_points": {"$gt": 0}}
+    )
+    # Convert the query result into a list of user documents and return it.
+    return await cursor.to_list(length=None)
+
 def userleaderboard_key(user: Dict) -> Tuple[int, int]:
     """Key function for sorting users in the leaderboard."""
     return (-user.get('total_points', 0), user.get('user_id', 0))
