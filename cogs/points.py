@@ -261,26 +261,47 @@ class Points(commands.Cog):
         users = await db.get_leaderboard_users(ctx.guild.id) 
 
         if not users:
-            await ctx.send("No users with recent points found.")
+            await ctx.send("The server is clean. No recent infractions found.")
             return
         
-
-
+        # --- Start of New Embed Code ---
         embed = discord.Embed(
-            title="🤡 Hall of Shame (Last 20 Days)", 
-            color=discord.Color.red(),
+            title="WALL OF SHAME",
+            description="A list of members most familiar with the rulebook, page by page.\n*This board tracks infractions from the last 20 days.*",
+            color=0x2f3136,  # A dark, almost black color for a serious tone
             timestamp=ctx.message.created_at
         )
+        
+        # An image of a pillory (stocks) to represent public shame.
+        embed.set_thumbnail(url="https://i.imgur.com/uS2dY4M.png")
 
         leaderboard_lines = []
+        
+        # Medals for the top 3 offenders
+        medals = { 1: "💩", 2: "🤡", 3: "🤓" }
+        
         for idx, user in enumerate(users[:10], start=1):
             member = ctx.guild.get_member(user['user_id'])
-            name = member.display_name if member else f"User ID {user['user_id']}"
-            points = user.get('total_points', 0)
-            leaderboard_lines.append(f"**{idx}. {name}** - {points} MP")
 
-        embed.description = "\n".join(leaderboard_lines)
+            name = member.mention if member else f"User ID `{user['user_id']}`"
+            points = user.get('total_points', 0)
+            
+
+            rank_icon = medals.get(idx, "▫️")
+            
+            leaderboard_lines.append(f"{rank_icon} **{name}**: {points} MP")
+        
+        # Add the formatted list of users to the embed.
+        embed.add_field(
+            name="Top Offenders",
+            value="\n".join(leaderboard_lines),
+            inline=False
+        )
+        
+        embed.set_footer(text="This is a list you don't want to be on. Behave.")
+
         await ctx.send(embed=embed)
+
             
 async def setup(bot):
     await bot.add_cog(Points(bot))
