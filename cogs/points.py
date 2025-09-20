@@ -253,7 +253,7 @@ class Points(commands.Cog):
 
         except Exception as e:
             await ctx.send(f"❌ An unexpected error occurred. Please check the logs.")
-            print(f"Error in !deduct command: {e}") # Log the error to your console
+            print(f"Error in !deduct command: {e}") 
 
     @commands.command(name="leaderboard")
     async def leaderboard(self, ctx):
@@ -263,24 +263,37 @@ class Points(commands.Cog):
             await ctx.send("No users with points found.")
             return
 
-        # Sort users by total_points descending, then by user_id ascending
+
         users.sort(key=db.userleaderboard_key)
 
         embed = discord.Embed(
-            title="🏆 Hall of shame",
+            title="🏆 Hall of Shame",
+            description="Top 10 Most Punished Members",
             color=discord.Color.gold(),
             timestamp=ctx.message.created_at
         )
 
-        leaderboard_lines = []
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+        
         for idx, user in enumerate(users[:10], start=1):
             member = ctx.guild.get_member(user['user_id'])
-            name = member.display_name if member else f"User ID {user['user_id']}"
+            if not member:
+                continue
+                
             points = user.get('total_points', 0)
-            leaderboard_lines.append(f"**{idx}. {name}** - {points} MP")
+            medal = medals.get(idx, f"#{idx}")
+            
+            embed.add_field(
+                name=f"{medal} {member.display_name}",
+                value=f"**MP:** {points}\n{'🟥' * min(points, 5)}",
+                inline=False
+            )
 
-        embed.description = "\n".join(leaderboard_lines)
-        await ctx.send(embed=embed)        
+            if idx == 1:
+                embed.set_thumbnail(url=member.display_avatar.url)
+
+        embed.set_footer(text=f"Total Participants: {len(users)}")
+        await ctx.send(embed=embed)
             
 async def setup(bot):
     await bot.add_cog(Points(bot))
