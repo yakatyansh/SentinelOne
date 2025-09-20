@@ -205,3 +205,7 @@ async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> in
     )
     
     return new_total_points
+
+def userleaderboard_key(user: Dict) -> Tuple[int, int]:
+    """Key function for sorting users in the leaderboard."""
+    return (-user.get('total_points', 0), user.get('user_id', 0))

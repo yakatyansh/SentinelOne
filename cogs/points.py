@@ -254,6 +254,33 @@ class Points(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ An unexpected error occurred. Please check the logs.")
             print(f"Error in !deduct command: {e}") # Log the error to your console
+
+    @commands.command(name="leaderboard")
+    async def leaderboard(self, ctx):
+        """Display the points leaderboard for the server"""
+        users = await db.get_all_users(ctx.guild.id)
+        if not users:
+            await ctx.send("No users with points found.")
+            return
+
+        # Sort users by total_points descending, then by user_id ascending
+        users.sort(key=db.userleaderboard_key)
+
+        embed = discord.Embed(
+            title="🏆 Hall of shame",
+            color=discord.Color.gold(),
+            timestamp=ctx.message.created_at
+        )
+
+        leaderboard_lines = []
+        for idx, user in enumerate(users[:10], start=1):
+            member = ctx.guild.get_member(user['user_id'])
+            name = member.display_name if member else f"User ID {user['user_id']}"
+            points = user.get('total_points', 0)
+            leaderboard_lines.append(f"**{idx}. {name}** - {points} MP")
+
+        embed.description = "\n".join(leaderboard_lines)
+        await ctx.send(embed=embed)        
             
 async def setup(bot):
     await bot.add_cog(Points(bot))
