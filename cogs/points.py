@@ -264,20 +264,18 @@ class Points(commands.Cog):
             await ctx.send("The server is clean. No recent infractions found.")
             return
         
-        # --- Start of New Embed Code ---
+
         embed = discord.Embed(
             title="WALL OF SHAME",
             description="A list of members most familiar with the rulebook, page by page.\n*This board tracks infractions from the last 20 days.*",
-            color=0x2f3136,  # A dark, almost black color for a serious tone
+            color=0x2f3136, 
             timestamp=ctx.message.created_at
         )
         
-        # An image of a pillory (stocks) to represent public shame.
         embed.set_thumbnail(url="https://i.pinimg.com/474x/6f/46/01/6f46018cba280f9d00176726fec6585e.jpg")
 
         leaderboard_lines = []
         
-        # Medals for the top 3 offenders
         medals = { 1: "💩", 2: "🤡", 3: "🤓" }
         
         for idx, user in enumerate(users[:10], start=1):

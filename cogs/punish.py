@@ -7,56 +7,6 @@ from utils.mutepoint import MutePointSystem
 
 
 class Punishments(commands.Cog):
-    ADMIN_ROLES = [
-        "୧ : CLUB MANAGER ᐟ⋆",
-        "୧ : CLUB DIRECTOR ᐟ⋆",
-        "୧ : CLUB PRESIDENT ᐟ⋆",
-        "୧ : CLUB OWNER ᐟ⋆"
-    ]
-    
-    MOD_ROLES = [
-        "୧ : ASSISTANT REFREE ᐟ⋆",
-        "୧ :REFEREE ᐟ⋆"
-    ]
-
-    def _has_higher_role(self, author, target):
-        """Check if author has higher role than target"""
-        author_roles = set(role.name for role in author.roles)
-        target_roles = set(role.name for role in target.roles)
-        
-        # Check for admin roles
-        author_admin_level = -1
-        target_admin_level = -1
-        
-        for i, role in enumerate(self.ADMIN_ROLES):
-            if role in author_roles:
-                author_admin_level = i
-            if role in target_roles:
-                target_admin_level = i
-
-        if target_admin_level >= 0:
-            return author_admin_level > target_admin_level
-            
-        author_mod_level = -1
-        target_mod_level = -1
-        
-        for i, role in enumerate(self.MOD_ROLES):
-            if role in author_roles:
-                author_mod_level = i
-            if role in target_roles:
-                target_mod_level = i
-        
-        if author_admin_level >= 0:
-            return True
-            
-        if target_mod_level >= 0:
-            return author_mod_level > target_mod_level
-            
-        if author_mod_level >= 0:
-            return True
-            
-        return False
-
     def __init__(self, bot):
         self.bot = bot
 
@@ -130,20 +80,7 @@ class Punishments(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def punish(self, ctx, member: discord.Member, *, reason):
-        if not self._has_higher_role(ctx.author, member):
-            await ctx.send("❌ You cannot punish someone with an equal or higher role than you.")
-            return
-        
-        author_roles = set(role.name for role in ctx.author.roles)
-        target_roles = set(role.name for role in member.roles)
-        
-        is_author_mod = any(role in author_roles for role in self.MOD_ROLES)
-        is_target_admin = any(role in target_roles for role in self.ADMIN_ROLES)
-        
-        if is_author_mod and is_target_admin:
-            await ctx.send("❌ Moderators cannot punish administrators.")
-            return
-
+        """Punish a user based on the offense reason."""
         total_points = await db.check_expired_points(ctx.guild.id, member.id)
         
         valid_reasons = list(MutePointSystem.POINTS.keys())
@@ -251,11 +188,6 @@ class Punishments(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def release(self, ctx, member: discord.Member):
         """Release a user from timeout and remove the 'Yellow Card' role."""
-        # Check role hierarchy
-        if not self._has_higher_role(ctx.author, member):
-            await ctx.send("❌ You cannot release someone with an equal or higher role than you.")
-            return
-
         yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
 
         try:
