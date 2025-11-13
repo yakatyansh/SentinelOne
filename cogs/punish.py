@@ -81,6 +81,10 @@ class Punishments(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def punish(self, ctx, member: discord.Member, *, reason):
         """Punish a user based on the offense reason."""
+        if member.id == ctx.author.id:
+            await ctx.send("❌ You cannot punish yourself.")
+            return
+
         total_points = await db.check_expired_points(ctx.guild.id, member.id)
         
         valid_reasons = list(MutePointSystem.POINTS.keys())
