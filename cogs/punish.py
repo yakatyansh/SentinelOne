@@ -213,5 +213,84 @@ class Punishments(commands.Cog):
         except:
             await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
 
+    @staticmethod
+    def _parse_duration(s: str):
+        """Parse duration strings like '1d', '2h30m', '45m', '90s', '1:30' (hh:mm) -> timedelta or None."""
+        import re
+        from datetime import timedelta
+
+        if not s:
+            return None
+        s = s.strip().lower()
+        # plain number -> seconds
+        if s.isdigit():
+            return timedelta(seconds=int(s))
+        # combined format: 1d2h30m10s
+        m = re.fullmatch(r'(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?', s)
+        if m and any(m.groups()):
+            days = int(m.group(1) or 0)
+            hours = int(m.group(2) or 0)
+            minutes = int(m.group(3) or 0)
+            seconds = int(m.group(4) or 0)
+            if days + hours + minutes + seconds == 0:
+                return None
+            return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+        # colon format: hh:mm or mm:ss or hh:mm:ss
+        if ':' in s:
+            parts = s.split(':')
+            try:
+                if len(parts) == 2:
+                    h = int(parts[0]); m_ = int(parts[1])
+                    # interpret as hh:mm if hours < 24 else as mm:ss - we'll treat as hh:mm
+                    return timedelta(hours=h, minutes=m_)
+                if len(parts) == 3:
+                    return timedelta(hours=int(parts[0]), minutes=int(parts[1]), seconds=int(parts[2]))
+            except:
+                return None
+        return None
+
+    @commands.command(name="sybau")
+    @commands.has_permissions(manage_messages=True)
+    async def mute(self, ctx, member: discord.Member, duration: str, *, reason: str = "Muted by staff"):
+        """Temporarily mute a member for a custom duration.
+        Duration examples: 1d, 2h30m, 45m, 90s, 1:30 (hh:mm). This command does NOT add MP.
+        """
+        # prevent self-muting
+        if member.id == ctx.author.id:
+            await ctx.send("❌ You cannot mute yourself.")
+            return
+
+        td = self._parse_duration(duration)
+        if not td or td.total_seconds() <= 0:
+            await ctx.send("❌ Invalid duration. Examples: `1d`, `2h30m`, `45m`, `90s`, `1:30`.")
+            return
+
+        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+        try:
+            await member.timeout(td, reason=reason)
+            # add yellow card role if exists
+            if yellow_card_role:
+                try:
+                    await member.add_roles(yellow_card_role, reason="Mute issued by bot")
+                except discord.Forbidden:
+                    # continue even if role assign fails
+                    pass
+
+                # schedule removal task using existing helper
+                self.bot.loop.create_task(
+                    self.remove_yellow_card_after_timeout(
+                        member,
+                        int(td.total_seconds())
+                    )
+                )
+
+            await ctx.send(f"⏳ {member.mention} has been muted for **{MutePointSystem.format_duration(td)}**. Reason: {reason}")
+            # log, mp_given = 0 because this is a manual mute
+            await self.log_punishment(ctx, member, reason, 0, td)
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to mute this user.")
+        except Exception as e:
+            await ctx.send(f"⚠️ Failed to mute: {e}")
+
 async def setup(bot):
     await bot.add_cog(Punishments(bot))
