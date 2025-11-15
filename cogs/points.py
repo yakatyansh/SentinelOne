@@ -181,6 +181,7 @@ class Points(commands.Cog):
             ("!points @user", "Check warnings and MP"),
             ("!clearpoints @user", "Clear all warnings and MP"),
             ("!release @user", "Remove active mute"),
+            ("!sybau @user <duration> [reason]", "Temporarily mute without MP"),
             ("Report", "React 🆘 to report message")
         ]
 
