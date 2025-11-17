@@ -255,10 +255,6 @@ class Punishments(commands.Cog):
         """Temporarily mute a member for a custom duration.
         Duration examples: 1d, 2h30m, 45m, 90s, 1:30 (hh:mm). This command does NOT add MP.
         """
-        # prevent self-muting
-        if member.id == ctx.author.id:
-            await ctx.send("❌ You cannot mute yourself.")
-            return
 
         td = self._parse_duration(duration)
         if not td or td.total_seconds() <= 0:
