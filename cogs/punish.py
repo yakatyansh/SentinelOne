@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
 from asyncio import sleep
+import asyncio
 import discord
 from discord.ext import commands
 from utils import db
 from utils.mutepoint import MutePointSystem
 
+MAX_TIMEOUT_DAYS = 28  # Discord API max for member.timeout
 
 class Punishments(commands.Cog):
     def __init__(self, bot):
@@ -249,42 +251,85 @@ class Punishments(commands.Cog):
                 return None
         return None
 
+    async def _long_mute_scheduler(self, guild_id: int, user_id: int, role_id: int, seconds: int):
+        """Background task to remove role-based long mutes. Not persistent across restarts."""
+        try:
+            await asyncio.sleep(seconds)
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                return
+            member = guild.get_member(user_id)
+            role = guild.get_role(role_id)
+            if member and role and role in member.roles:
+                try:
+                    await member.remove_roles(role, reason="Long mute expired")
+                except Exception:
+                    pass
+                # optional notify channel/DM
+                try:
+                    await member.send(f"Your long mute has ended in **{guild.name}**.")
+                except:
+                    pass
+            # If you persist long-mutes in DB, remove entry here.
+        except Exception as e:
+            print(f"[ERROR] long mute scheduler failed: {e}")
+
     @commands.command(name="sybau")
     @commands.has_permissions(manage_messages=True)
     async def mute(self, ctx, member: discord.Member, duration: str, *, reason: str = "Muted by staff"):
-        """Temporarily mute a member for a custom duration.
-        Duration examples: 1d, 2h30m, 45m, 90s, 1:30 (hh:mm). This command does NOT add MP.
+        """Temporarily mute a member. Examples: 1d, 2h30m, 45m, 90s, 1:30 (hh:mm).
+        Uses Discord timeout for <=28 days; for longer durations assigns a 'Muted (Long)' role.
         """
+        if member.id == ctx.author.id:
+            await ctx.send("❌ You cannot mute yourself.")
+            return
 
         td = self._parse_duration(duration)
         if not td or td.total_seconds() <= 0:
             await ctx.send("❌ Invalid duration. Examples: `1d`, `2h30m`, `45m`, `90s`, `1:30`.")
             return
 
+        max_td = timedelta(days=MAX_TIMEOUT_DAYS)
         yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+
         try:
-            await member.timeout(td, reason=reason)
-            # add yellow card role if exists
-            if yellow_card_role:
-                try:
-                    await member.add_roles(yellow_card_role, reason="Mute issued by bot")
-                except discord.Forbidden:
-                    # continue even if role assign fails
-                    pass
-
-                # schedule removal task using existing helper
-                self.bot.loop.create_task(
-                    self.remove_yellow_card_after_timeout(
-                        member,
-                        int(td.total_seconds())
+            if td <= max_td:
+                # Use Discord native timeout
+                await member.timeout(td, reason=reason)
+                if yellow_card_role:
+                    try:
+                        await member.add_roles(yellow_card_role, reason="Mute issued by bot")
+                    except discord.Forbidden:
+                        pass
+                    self.bot.loop.create_task(
+                        self.remove_yellow_card_after_timeout(member, int(td.total_seconds()))
                     )
-                )
+                await ctx.send(f"⏳ {member.mention} muted for **{MutePointSystem.format_duration(td)}** (Discord timeout). Reason: {reason}")
+            else:
+                # Fallback to role-based long mute
+                role_name = "Muted (Long)"
+                guild = ctx.guild
+                muted_role = discord.utils.get(guild.roles, name=role_name)
+                if not muted_role:
+                    # Create role and set basic channel overwrites (requires manage_roles & manage_channels)
+                    muted_role = await guild.create_role(name=role_name, reason="Role for long mutes")
+                    for ch in guild.channels:
+                        try:
+                            await ch.set_permissions(muted_role, send_messages=False, speak=False, add_reactions=False)
+                        except Exception:
+                            pass
 
-            await ctx.send(f"⏳ {member.mention} has been muted for **{MutePointSystem.format_duration(td)}**. Reason: {reason}")
-            # log, mp_given = 0 because this is a manual mute
+                await member.add_roles(muted_role, reason=f"Long mute: {duration} by {ctx.author}")
+                await ctx.send(f"🔇 {member.mention} muted for **{MutePointSystem.format_duration(td)}** using role `{role_name}`. Reason: {reason}")
+
+                # schedule removal (in-memory). For persistence, save end timestamp to DB and re-schedule on startup.
+                seconds = int(td.total_seconds())
+                self.bot.loop.create_task(self._long_mute_scheduler(ctx.guild.id, member.id, muted_role.id, seconds))
+
+            # Log (manual mute gives 0 MP)
             await self.log_punishment(ctx, member, reason, 0, td)
         except discord.Forbidden:
-            await ctx.send("❌ I don't have permission to mute this user.")
+            await ctx.send("❌ I don't have permission to mute this user or manage roles.")
         except Exception as e:
             await ctx.send(f"⚠️ Failed to mute: {e}")
 
