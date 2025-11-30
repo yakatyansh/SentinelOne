@@ -27,7 +27,6 @@ class Games(commands.Cog):
             await ctx.send(embed=embed)
             await ctx.message.add_reaction("🎄")
         except Exception:
-            # Ignore send/react errors (e.g., missing permissions)
             pass
 
     @commands.command(name="roast")
@@ -35,7 +34,6 @@ class Games(commands.Cog):
         """Roast the command author or a mentioned member using ChatGPT"""
         target = member if member else ctx.author
         
-        # Build prompt based on roles
         roles = [role.name for role in target.roles if role.name != "@everyone"]
         roles_str = ", ".join(roles) if roles else "no roles"
         
