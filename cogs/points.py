@@ -314,7 +314,7 @@ class Points(commands.Cog):
             color=discord.Color.red(),
             timestamp=ctx.message.created_at
         )
-        embed.set_footer(text="From the SentinelOne team")
+        embed.set_footer(text="From Markaroni and Team")
         try:
             await ctx.send(embed=embed)
             await ctx.message.add_reaction("🎄")
