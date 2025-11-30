@@ -30,4 +30,5 @@ class Games(commands.Cog):
                 pass
 
 
-            
+async def setup(bot):
+    await bot.add_cog(Games(bot))            
