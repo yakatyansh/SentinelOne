@@ -29,39 +29,39 @@ class Games(commands.Cog):
         except Exception:
             pass
 
-    @commands.command(name="roast")
-    async def roast(self, ctx, member: discord.Member = None):
-        """Roast the command author or a mentioned member using ChatGPT"""
-        target = member if member else ctx.author
+    # @commands.command(name="roast")
+    # async def roast(self, ctx, member: discord.Member = None):
+    #     """Roast the command author or a mentioned member using ChatGPT"""
+    #     target = member if member else ctx.author
         
-        roles = [role.name for role in target.roles if role.name != "@everyone"]
-        roles_str = ", ".join(roles) if roles else "no roles"
+    #     roles = [role.name for role in target.roles if role.name != "@everyone"]
+    #     roles_str = ", ".join(roles) if roles else "no roles"
         
-        prompt = (
-            f"Write a funny, lighthearted roast (2-3 sentences max) for a Discord user with these roles: {roles_str}. "
-            f"The roast should be playful and not mean-spirited. Keep it under 150 characters."
-        )
+    #     prompt = (
+    #         f"Write a funny, lighthearted roast (2-3 sentences max) for a Discord user with these roles: {roles_str}. "
+    #         f"The roast should be playful and not mean-spirited. Keep it under 150 characters."
+    #     )
         
-        try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=100,
-                temperature=0.7
-            )
-            roast_text = response.choices[0].message.content.strip()
+    #     try:
+    #         response = client.chat.completions.create(
+    #             model="gpt-3.5-turbo",
+    #             messages=[{"role": "user", "content": prompt}],
+    #             max_tokens=100,
+    #             temperature=0.7
+    #         )
+    #         roast_text = response.choices[0].message.content.strip()
             
-            embed = discord.Embed(
-                title="🔥 Roast Alert",
-                description=f"{target.mention}\n\n{roast_text}",
-                color=discord.Color.orange(),
-                timestamp=ctx.message.created_at
-            )
-            embed.set_footer(text="Roasted by Collina")
-            await ctx.send(embed=embed)
+    #         embed = discord.Embed(
+    #             title="🔥 Roast Alert",
+    #             description=f"{target.mention}\n\n{roast_text}",
+    #             color=discord.Color.orange(),
+    #             timestamp=ctx.message.created_at
+    #         )
+    #         embed.set_footer(text="Roasted by Collina")
+    #         await ctx.send(embed=embed)
             
-        except Exception as e:
-            await ctx.send(f"❌ Error generating roast: {str(e)}")
+    #     except Exception as e:
+    #         await ctx.send(f"❌ Error generating roast: {str(e)}")
 
 
 async def setup(bot):
