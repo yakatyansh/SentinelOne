@@ -193,15 +193,33 @@ class Punishments(commands.Cog):
     @commands.command(name="release")
     @commands.has_permissions(manage_messages=True)
     async def release(self, ctx, member: discord.Member):
-        """Release a user from timeout and remove the 'Yellow Card' role."""
+        """Release a user from timeout and remove the 'Yellow Card' role and long-mute role if present."""
         yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+        long_muted_role = discord.utils.get(ctx.guild.roles, name="Muted (Long)")
 
         try:
-            await member.timeout(None, reason="Manual unmute by moderator.")
-            await ctx.send(f"🔓 {member.mention} has been released (unmuted).")
+            # Remove discord timeout (if any)
+            try:
+                await member.timeout(None, reason="Manual unmute by moderator.")
+            except Exception:
+                # ignore if API doesn't support or user isn't timed out
+                pass
 
-            if yellow_card_role in member.roles:
-                await member.remove_roles(yellow_card_role, reason="User unmuted")
+            # Remove long-role mute if present
+            if long_muted_role and long_muted_role in member.roles:
+                try:
+                    await member.remove_roles(long_muted_role, reason="Manual unmute by moderator.")
+                except Exception:
+                    pass
+
+            # Remove yellow card role if present
+            if yellow_card_role and yellow_card_role in member.roles:
+                try:
+                    await member.remove_roles(yellow_card_role, reason="User unmuted")
+                except Exception:
+                    pass
+
+            await ctx.send(f"🔓 {member.mention} has been released (unmuted).")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unmute or modify roles.")
         except Exception as e:
