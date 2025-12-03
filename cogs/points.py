@@ -303,7 +303,6 @@ class Points(commands.Cog):
 
     @commands.command(name="xmas")
     @commands.guild_only()
-    @commands.has_permissions(manage_messages=True)
     async def xmas(self, ctx):
         """Send a Merry Xmas message"""
         embed = discord.Embed(
