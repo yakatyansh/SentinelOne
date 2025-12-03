@@ -46,11 +46,7 @@ pip install -r requirements.txt
   ```env
   DISCORD_BOT_TOKEN=your_token_here
   ```
-* Configure your channel IDs and roles in `config.py` or wherever your constants are defined:
 
-  ```python
-  LOG_CHANNEL_ID = 1395499760676376577  # Replace with your actual log channel ID
-  ```
 
 ---
 
@@ -96,4 +92,5 @@ PRs and suggestions are welcome! This bot is a WIP and designed specifically for
 ## 📄 License
 
 MIT License – feel free to use, modify, and share.
+
 
