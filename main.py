@@ -26,7 +26,7 @@ async def on_ready():
     print('------')
 
 async def load_extensions():
-    initial_extensions = ['cogs.punish','cogs.points','cogs.reports','cogs.games']
+    initial_extensions = ['cogs.punish','cogs.points','cogs.reports']
     for ext in initial_extensions:
         try:
             await bot.load_extension(ext)
