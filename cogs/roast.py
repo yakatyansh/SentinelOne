@@ -52,7 +52,7 @@ class Roast(commands.Cog):
                 "Kane left for a reason... and it wasn't the winning culture 👋",
             ],
             "real madrid": [
-                "Real Madrid: 13 Champions Leagues and they STILL bully fans about it 😤",
+                "Real Madrid: 16 Champions Leagues and they STILL bully fans about it 😤",
                 "They've got so many trophies they need a bigger museum 🏆🏆🏆",
                 "Real Madrid's arrogance is only matched by their success (which is annoying) 🤎",
                 "Even their losses are dramatic and iconic 🎭",
