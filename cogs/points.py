@@ -301,10 +301,10 @@ class Points(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(name="xmas")
+    @commands.command(name="roast")
     @commands.guild_only()
     async def xmas(self, ctx):
-        """Send a Merry Xmas message"""
+        """roast a football club"""
         embed = discord.Embed(
             title="🎄 Merry Christmas!",
             description=(
