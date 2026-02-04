@@ -300,27 +300,6 @@ class Points(commands.Cog):
         embed.set_footer(text="This is a list you don't want to be on. Behave.")
 
         await ctx.send(embed=embed)
-
-    @commands.command(name="roast")
-    @commands.guild_only()
-    async def xmas(self, ctx):
-        """roast a football club"""
-        embed = discord.Embed(
-            title="🎄 Merry Christmas!",
-            description=(
-                f"Happy holidays, {ctx.author.mention}!\n\n"
-                "Wishing you joy, peace, and plenty of good vibes this season. "
-                "Stay safe and enjoy the holidays! 🎁✨"
-            ),
-            color=discord.Color.red(),
-            timestamp=ctx.message.created_at
-        )
-        embed.set_footer(text="From Markaroni and Team")
-        try:
-            await ctx.send(embed=embed)
-            await ctx.message.add_reaction("🎄")
-        except Exception:
-            pass
             
 async def setup(bot):
     await bot.add_cog(Points(bot))
