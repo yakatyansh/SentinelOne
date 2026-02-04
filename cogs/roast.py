@@ -115,6 +115,7 @@ class Roast(commands.Cog):
         }
 
     @commands.command(name="roast")
+    @commands.has_permissions(manage_messages=True)
     async def roast_club(self, ctx, *, club_name: str = None):
         """Roast a football club! Usage: !roast [club name]"""
         
