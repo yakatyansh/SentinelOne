@@ -138,9 +138,27 @@ async def check_expired_points(guild_id: int, user_id: int) -> int:
     total_points = 0
     
     for punishment in user_data.get('punishments', []):
-        if punishment['timestamp'] > expiry_date:
-            active_punishments.append(punishment)
-            total_points += punishment['points']
+        # tolerate malformed data so a single bad entry doesn't crash the bot
+        try:
+            ts = punishment.get('timestamp')
+            if not isinstance(ts, datetime):
+                # try parsing ISO string if present
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts)
+                    except Exception:
+                        # give up on this entry
+                        print(f"[WARNING] bad timestamp for user {user_id}: {ts}")
+                        continue
+                else:
+                    print(f"[WARNING] unexpected timestamp type for user {user_id}: {type(ts)}")
+                    continue
+            if ts > expiry_date:
+                active_punishments.append(punishment)
+                total_points += punishment.get('points', 0)
+        except Exception as exc:
+            print(f"[ERROR] check_expired_points skipped entry due to {exc}")
+            continue
 
     # Update database with only active punishments
     await users_collection.update_one(

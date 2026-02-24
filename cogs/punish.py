@@ -83,112 +83,120 @@ class Punishments(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def punish(self, ctx, member: discord.Member, *, reason):
         """Punish a user based on the offense reason."""
-        if member.id == ctx.author.id:
-            await ctx.send("❌ You cannot punish yourself.")
-            return
+        # wrap whole command in try/except so a crash never leaves the mod
+        # waiting in silence
+        try:
+            if member.id == ctx.author.id:
+                await ctx.send("❌ You cannot punish yourself.")
+                return
 
-        total_points = await db.check_expired_points(ctx.guild.id, member.id)
-        
-        valid_reasons = list(MutePointSystem.POINTS.keys())
-        reason = reason.lower().strip()
+            total_points = await db.check_expired_points(ctx.guild.id, member.id)
 
-        if reason not in valid_reasons:
-            await ctx.send(f"❌ Invalid reason. Use one of: {', '.join(valid_reasons)}.")
-            return
+            valid_reasons = list(MutePointSystem.POINTS.keys())
+            reason = reason.lower().strip()
 
-        if reason == "advisory":
-            warning_count = await db.get_warning_count(ctx.guild.id, member.id)
-            warning_count, should_mute = await db.add_warning(ctx.guild.id, member.id, ctx.author.id, reason)
-            
-            if warning_count == 1:
-                await ctx.send(f"⚠️ **Warning #{warning_count}** issued to {member.mention}")
-                duration = None
-            elif warning_count == 2:
-                duration = MutePointSystem.DURATIONS[0]  
-                try:
-                    await member.timeout(duration, reason="Second advisory warning")
-                    await ctx.send(f"⏳ {member.mention} has been muted for **5 minutes** (Warning #{warning_count})")
-                    yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+            if reason not in valid_reasons:
+                await ctx.send(f"❌ Invalid reason. Use one of: {', '.join(valid_reasons)}.")
+                return
+
+            if reason == "advisory":
+                warning_count = await db.get_warning_count(ctx.guild.id, member.id)
+                warning_count, should_mute = await db.add_warning(ctx.guild.id, member.id, ctx.author.id, reason)
+
+                if warning_count == 1:
+                    await ctx.send(f"⚠️ **Warning #{warning_count}** issued to {member.mention}")
+                    duration = None
+                elif warning_count == 2:
+                    duration = MutePointSystem.DURATIONS[0]
+                    try:
+                        await member.timeout(duration, reason="Second advisory warning")
+                        await ctx.send(f"⏳ {member.mention} has been muted for **5 minutes** (Warning #{warning_count})")
+                        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+                        if yellow_card_role:
+                            await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory warning)")
+                            self.bot.loop.create_task(
+                                self.remove_yellow_card_after_timeout(
+                                    member,
+                                    int(duration.total_seconds())
+                                )
+                            )
+                    except discord.Forbidden:
+                        await ctx.send("❌ I don't have permission to mute this user.")
+                else:
+                    points = 1
+                    total_points = await db.add_punishment(ctx.guild.id, member.id, "advisory_conversion", points)
+                    duration = MutePointSystem.DURATIONS[1]  # 15 minutes
+                    yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᎎᎎ")
                     if yellow_card_role:
-                        await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory warning)")
+                        await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory conversion)")
                         self.bot.loop.create_task(
                             self.remove_yellow_card_after_timeout(
-                                member, 
+                                member,
                                 int(duration.total_seconds())
                             )
                         )
-                except discord.Forbidden:
-                    await ctx.send("❌ I don't have permission to mute this user.")
-            else:  
-                points = 1  
-                total_points = await db.add_punishment(ctx.guild.id, member.id, "advisory_conversion", points)
-                duration = MutePointSystem.DURATIONS[1]  # 15 minutes
-                yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+                    await member.timeout(duration, reason="Third advisory warning converted to MP")
+                    await ctx.send(f"⚠️ {member.mention} has received **1 MP** after 3 warnings")
+                    await db.clear_warnings(ctx.guild.id, member.id)
+
+                await self.log_punishment(ctx, member, f"Advisory Warning #{warning_count}", 0, duration)
+                return
+
+            # Handle regular punishments
+            points = MutePointSystem.POINTS[reason]
+            total_points = await db.add_punishment(ctx.guild.id, member.id, reason, points)
+
+            # Check MP thresholds first
+            if total_points >= 15:
+                await ctx.send(f"🚨 **Ban vote triggered for {member.mention}** (15 MP reached).")
+                await self.trigger_ban_vote(ctx, member)
+                return
+            elif total_points >= 10:
+                duration = MutePointSystem.MP_THRESHOLDS[10]  # 7-day mute
+            elif total_points >= 8:
+                duration = MutePointSystem.MP_THRESHOLDS[8]   # 3-day mute
+            elif total_points >= 5:
+                duration = MutePointSystem.MP_THRESHOLDS[5]   # 1-day mute
+            else:
+                duration = MutePointSystem.DURATIONS[points]  # Base duration for offense
+
+            yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᏎᏎ")
+
+            try:
+                await member.timeout(duration, reason=f"Punished for: {reason}")
+                await ctx.send(f"⏳ {member.mention} has been muted for **{MutePointSystem.format_duration(duration)}**.")
+
                 if yellow_card_role:
-                    await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory conversion)")
+                    await member.add_roles(yellow_card_role, reason="Mute issued by bot")
                     self.bot.loop.create_task(
                         self.remove_yellow_card_after_timeout(
-                            member, 
+                            member,
                             int(duration.total_seconds())
                         )
                     )
-                await member.timeout(duration, reason="Third advisory warning converted to MP")
-                await ctx.send(f"⚠️ {member.mention} has received **1 MP** after 3 warnings")
-                await db.clear_warnings(ctx.guild.id, member.id)
-            
-            await self.log_punishment(ctx, member, f"Advisory Warning #{warning_count}", 0, duration)
-            return
+            except discord.Forbidden:
+                await ctx.send("❌ I don't have permission to mute or assign roles to this user.")
+            except Exception as e:
+                await ctx.send(f"⚠️ Failed to mute or assign role: {e}")
 
-        # Handle regular punishments
-        points = MutePointSystem.POINTS[reason]
-        total_points = await db.add_punishment(ctx.guild.id, member.id, reason, points)
-        
-        # Check MP thresholds first
-        if total_points >= 15:
-            await ctx.send(f"🚨 **Ban vote triggered for {member.mention}** (15 MP reached).")
-            await self.trigger_ban_vote(ctx, member)
-            return
-        elif total_points >= 10:
-            duration = MutePointSystem.MP_THRESHOLDS[10]  # 7-day mute
-        elif total_points >= 8:
-            duration = MutePointSystem.MP_THRESHOLDS[8]   # 3-day mute
-        elif total_points >= 5:
-            duration = MutePointSystem.MP_THRESHOLDS[5]   # 1-day mute
-        else:
-            duration = MutePointSystem.DURATIONS[points]  # Base duration for offense
-
-        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
-
-        try:
-            await member.timeout(duration, reason=f"Punished for: {reason}")
-            await ctx.send(f"⏳ {member.mention} has been muted for **{MutePointSystem.format_duration(duration)}**.")
-
-            if yellow_card_role:
-                await member.add_roles(yellow_card_role, reason="Mute issued by bot")
-                self.bot.loop.create_task(
-                    self.remove_yellow_card_after_timeout(
-                        member, 
-                        int(duration.total_seconds())
-                    )
+            # Send DM
+            try:
+                await member.send(
+                    f"You have been punished in **{ctx.guild.name}** for **{reason}**.\n"
+                    f"Points added: **{points} MP**\n"
+                    f"Total mute points: **{total_points} MP**\n"
+                    f"Mute duration: **{MutePointSystem.format_duration(duration)}**"
                 )
-        except discord.Forbidden:
-            await ctx.send("❌ I don't have permission to mute or assign roles to this user.")
+            except:
+                await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
+
+            # Log the punishment
+            await self.log_punishment(ctx, member, reason, points, duration)
+
         except Exception as e:
-            await ctx.send(f"⚠️ Failed to mute or assign role: {e}")
-
-        # Send DM
-        try:
-            await member.send(
-                f"You have been punished in **{ctx.guild.name}** for **{reason}**.\n"
-                f"Points added: **{points} MP**\n"
-                f"Total mute points: **{total_points} MP**\n"
-                f"Mute duration: **{MutePointSystem.format_duration(duration)}**"
-            )
-        except:
-            await ctx.send(f"⚠️ Could not send DM to {member.mention}.")
-
-        # Log the punishment
-        await self.log_punishment(ctx, member, reason, points, duration)
+            # log for bot owner and inform mods
+            print(f"[ERROR] punish command crashed for guild {ctx.guild.id} user {member.id}: {e}")
+            await ctx.send("❌ An internal error occurred while processing the punishment.")
 
     @commands.command(name="release")
     @commands.has_permissions(manage_messages=True)
