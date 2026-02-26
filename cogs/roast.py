@@ -79,7 +79,10 @@ class Roast(commands.Cog):
             "psg": [
                 "PSG: Proof that Neymar's haircuts are more entertaining than their play ✂️",
                 "Paris Saint-Germain: Where superstar talent goes to underperform 📉",
-                "They've got Mbappé... wait, they lost Mbappé 💔",
+                "PSG's strategy: throw money at the problem and hope it goes away 💸",
+                "They've got the stars but can't seem to shine in Europe 🌟❌",
+                
+
             ],
             "juventus": [
                 "Juventus: Dominating Serie A like beating up your little brother 👊",
