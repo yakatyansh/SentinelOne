@@ -52,10 +52,14 @@ class Roast(commands.Cog):
                 "Kane left for a reason... and it wasn't the winning culture 👋",
             ],
             "real madrid": [
-                "Real Madrid: 16 Champions Leagues and they STILL bully fans about it 😤",
-                "They've got so many trophies they need a bigger museum 🏆🏆🏆",
-                "Real Madrid's arrogance is only matched by their success (which is annoying) 🤎",
-                "Even their losses are dramatic and iconic 🎭",
+                "Goals from close range are very good. But if you're Ronaldo, it's tap-in .",
+                "Real Madrid: The club that thinks spending money is a strategy 💸",
+                "Los Blancos: Where history is more important than the present 🏰",
+                "Real Madrid's recent form: a reminder that past glories don't guarantee future success 📉",
+                "They've got the Galácticos... but where's the galactic performance? 🌌",   
+                "Not even the VAR can tell why Real Madrid play like amateurs.",
+                
+
             ],
             "barcelona": [
                 "Barcelona: The club that squandered Messi and acted like it was no big deal 🐐",
