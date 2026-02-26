@@ -58,7 +58,8 @@ class Roast(commands.Cog):
                 "Real Madrid's recent form: a reminder that past glories don't guarantee future success 📉",
                 "They've got the Galácticos... but where's the galactic performance? 🌌",   
                 "Not even the VAR can tell why Real Madrid play like amateurs.",
-                
+                "The only team where their players use Google Maps to find the goalposts.",
+
 
             ],
             "barcelona": [
