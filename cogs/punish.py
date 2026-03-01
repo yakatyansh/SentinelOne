@@ -151,14 +151,21 @@ class Punishments(commands.Cog):
                 await ctx.send(f"🚨 **Ban vote triggered for {member.mention}** (15 MP reached).")
                 await self.trigger_ban_vote(ctx, member)
                 return
-            elif total_points >= 10:
-                duration = MutePointSystem.MP_THRESHOLDS[10]  # 7-day mute
-            elif total_points >= 8:
-                duration = MutePointSystem.MP_THRESHOLDS[8]   # 3-day mute
-            elif total_points >= 5:
-                duration = MutePointSystem.MP_THRESHOLDS[5]   # 1-day mute
+            
+            # Get base duration for this offense
+            base_duration = MutePointSystem.DURATIONS[points]
+            
+            if total_points > points:
+                if total_points >= 10:
+                    duration = max(base_duration, MutePointSystem.MP_THRESHOLDS[10])
+                elif total_points >= 8:
+                    duration = max(base_duration, MutePointSystem.MP_THRESHOLDS[8])
+                elif total_points >= 5:
+                    duration = max(base_duration, MutePointSystem.MP_THRESHOLDS[5])
+                else:
+                    duration = base_duration
             else:
-                duration = MutePointSystem.DURATIONS[points]  # Base duration for offense
+                duration = base_duration
 
             yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᏎᏎ")
 
