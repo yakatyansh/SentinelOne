@@ -235,6 +235,9 @@ class Punishments(commands.Cog):
                     pass
 
             await ctx.send(f"🔓 {member.mention} has been released (unmuted).")
+
+            # Log the release action
+            await self.log_release(ctx, member)
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unmute or modify roles.")
         except Exception as e:
@@ -283,6 +286,20 @@ class Punishments(commands.Cog):
             except:
                 return None
         return None
+
+    async def log_release(self, ctx, target_user):
+        """Log when a moderator releases (unmutes) a user."""
+        log_channel_id = 1406574258573803661  
+        log_channel = ctx.guild.get_channel(log_channel_id)
+        if log_channel:
+            embed = discord.Embed(
+                title="🔓 User Released",
+                color=discord.Color.green(),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Released User", value=target_user.mention, inline=True)
+            embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+            await log_channel.send(embed=embed)
 
     async def _long_mute_scheduler(self, guild_id: int, user_id: int, role_id: int, seconds: int):
         """Background task to remove role-based long mutes. Not persistent across restarts."""
