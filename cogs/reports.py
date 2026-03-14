@@ -14,44 +14,7 @@ class ReportSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_add(self, payload):
-        # Check if it's the SOS emoji (🆘)
-        if str(payload.emoji) != '🆘':
-            print(f"[DEBUG] Ignoring emoji: {payload.emoji}")
-            return
-
-        print(f"[DEBUG] SOS reaction detected by user {payload.user_id}")
-
-        # Get guild
-        guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
-            print("[DEBUG] Guild not found.")
-            return
-
-        # Get user who reacted
-        user = guild.get_member(payload.user_id)
-        if not user or user.bot:
-            print(f"[DEBUG] User is bot or not found. User: {user}")
-            return
-
-        # Get channel
-        channel = guild.get_channel(payload.channel_id)
-        if not channel:
-            print("[DEBUG] Channel not found.")
-            return
-
-        # Get message
-        try:
-            message = await channel.fetch_message(payload.message_id)
-            print(f"[DEBUG] Found message: {message.content[:50]}...")
-        except discord.NotFound:
-            print("[DEBUG] Message not found.")
-            return
-        except discord.Forbidden:
-            print("[DEBUG] No permission to fetch message.")
-            return
-
+    async def _process_report(self, user, message, channel, guild):
         # Don't allow reporting your own messages
         if message.author.id == user.id:
             try:
@@ -131,6 +94,68 @@ class ReportSystem(commands.Cog):
                 await user.send("❌ **An error occurred while processing your report.**\nPlease contact a moderator directly.")
             except:
                 pass
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        # Check if it's the SOS emoji (🆘)
+        if str(payload.emoji) != '🆘':
+            print(f"[DEBUG] Ignoring emoji: {payload.emoji}")
+            return
+
+        print(f"[DEBUG] SOS reaction detected by user {payload.user_id}")
+
+        # Get guild
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            print("[DEBUG] Guild not found.")
+            return
+
+        # Get user who reacted
+        user = guild.get_member(payload.user_id)
+        if not user or user.bot:
+            print(f"[DEBUG] User is bot or not found. User: {user}")
+            return
+
+        # Get channel
+        channel = guild.get_channel(payload.channel_id)
+        if not channel:
+            print("[DEBUG] Channel not found.")
+            return
+
+        # Get message
+        try:
+            message = await channel.fetch_message(payload.message_id)
+            print(f"[DEBUG] Found message: {message.content[:50]}...")
+        except discord.NotFound:
+            print("[DEBUG] Message not found.")
+            return
+        except discord.Forbidden:
+            print("[DEBUG] No permission to fetch message.")
+            return
+
+        await self._process_report(user, message, channel, guild)
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+        if not message.mentions or self.bot.user not in message.mentions:
+            return
+        if not message.reference:
+            return
+
+        channel = message.channel
+        guild = message.guild
+        user = message.author
+
+        try:
+            original_message = await channel.fetch_message(message.reference.message_id)
+        except discord.NotFound:
+            return
+        except discord.Forbidden:
+            return
+
+        await self._process_report(user, original_message, channel, guild)
 
 # Load the cog
 async def setup(bot):
