@@ -279,16 +279,28 @@ class Points(commands.Cog):
         
         medals = { 1: "💩", 2: "🤡", 3: "🤓" }
         
-        for idx, user in enumerate(users[:10], start=1):
+        # Only include members still in guild; skip users who left
+        displayed = 0
+        max_display = 10
+
+        for user in users:
+            if displayed >= max_display:
+                break
+
             member = ctx.guild.get_member(user['user_id'])
+            if not member:
+                continue
 
-            name = member.mention if member else f"User ID `{user['user_id']}`"
             points = user.get('total_points', 0)
-            
+            rank = displayed + 1
+            rank_icon = medals.get(rank, "▫️")
 
-            rank_icon = medals.get(idx, "▫️")
-            
-            leaderboard_lines.append(f"{rank_icon} **{name}**: {points} MP")
+            leaderboard_lines.append(f"{rank_icon} **{member.mention}**: {points} MP")
+            displayed += 1
+
+        if not leaderboard_lines:
+            await ctx.send("All top offenders have left the server. No active offenders to display.")
+            return
         
         # Add the formatted list of users to the embed.
         embed.add_field(

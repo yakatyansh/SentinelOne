@@ -7,6 +7,7 @@ from utils import db
 from utils.mutepoint import MutePointSystem
 
 MAX_TIMEOUT_DAYS = 28  # Discord API max for member.timeout
+ROLE_ON_PUNISH_ID = 1371504865905344526
 
 class Punishments(commands.Cog):
     def __init__(self, bot):
@@ -78,6 +79,17 @@ class Punishments(commands.Cog):
             if yellow_card_role and yellow_card_role in member.roles:
                 await member.remove_roles(yellow_card_role, reason="Timeout duration expired")
 
+    async def remove_role_after_timeout(self, member: discord.Member, role: discord.Role, duration: int):
+            await sleep(duration)
+            guild = member.guild
+            member = guild.get_member(member.id)
+            if not member or not role:
+                return
+            if role in member.roles:
+                await member.remove_roles(role, reason="Punishment role duration expired")
+
+    def get_punish_role(self, guild: discord.Guild):
+            return guild.get_role(ROLE_ON_PUNISH_ID)
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -111,12 +123,13 @@ class Punishments(commands.Cog):
                     try:
                         await member.timeout(duration, reason="Second advisory warning")
                         await ctx.send(f"⏳ {member.mention} has been muted for **5 minutes** (Warning #{warning_count})")
-                        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
-                        if yellow_card_role:
-                            await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory warning)")
+                        punish_role = self.get_punish_role(ctx.guild)
+                        if punish_role:
+                            await member.add_roles(punish_role, reason="Punish role assigned")
                             self.bot.loop.create_task(
-                                self.remove_yellow_card_after_timeout(
+                                self.remove_role_after_timeout(
                                     member,
+                                    punish_role,
                                     int(duration.total_seconds())
                                 )
                             )
@@ -126,12 +139,13 @@ class Punishments(commands.Cog):
                     points = 1
                     total_points = await db.add_punishment(ctx.guild.id, member.id, "advisory_conversion", points)
                     duration = MutePointSystem.DURATIONS[1]  # 15 minutes
-                    yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᎎᎎ")
-                    if yellow_card_role:
-                        await member.add_roles(yellow_card_role, reason="Mute issued by bot (advisory conversion)")
+                    punish_role = self.get_punish_role(ctx.guild)
+                    if punish_role:
+                        await member.add_roles(punish_role, reason="Punish role assigned")
                         self.bot.loop.create_task(
-                            self.remove_yellow_card_after_timeout(
+                            self.remove_role_after_timeout(
                                 member,
+                                punish_role,
                                 int(duration.total_seconds())
                             )
                         )
@@ -167,17 +181,18 @@ class Punishments(commands.Cog):
             else:
                 duration = base_duration
 
-            yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᏎᏎ")
+            punish_role = self.get_punish_role(ctx.guild)
 
             try:
                 await member.timeout(duration, reason=f"Punished for: {reason}")
                 await ctx.send(f"⏳ {member.mention} has been muted for **{MutePointSystem.format_duration(duration)}**.")
 
-                if yellow_card_role:
-                    await member.add_roles(yellow_card_role, reason="Mute issued by bot")
+                if punish_role:
+                    await member.add_roles(punish_role, reason="Punish role assigned")
                     self.bot.loop.create_task(
-                        self.remove_yellow_card_after_timeout(
+                        self.remove_role_after_timeout(
                             member,
+                            punish_role,
                             int(duration.total_seconds())
                         )
                     )
@@ -209,8 +224,9 @@ class Punishments(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def release(self, ctx, member: discord.Member):
         """Release a user from timeout and remove the 'Yellow Card' role and long-mute role if present."""
-        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᵎ")
+        yellow_card_role = discord.utils.get(ctx.guild.roles, name="ﾒ YELLOW CARD ᵎᎎ")
         long_muted_role = discord.utils.get(ctx.guild.roles, name="Muted (Long)")
+        punish_role = ctx.guild.get_role(ROLE_ON_PUNISH_ID)
 
         try:
             # Remove discord timeout (if any)
@@ -231,6 +247,12 @@ class Punishments(commands.Cog):
             if yellow_card_role and yellow_card_role in member.roles:
                 try:
                     await member.remove_roles(yellow_card_role, reason="User unmuted")
+                except Exception:
+                    pass
+
+            if punish_role and punish_role in member.roles:
+                try:
+                    await member.remove_roles(punish_role, reason="User unmuted")
                 except Exception:
                     pass
 
