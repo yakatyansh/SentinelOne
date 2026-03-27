@@ -23,6 +23,10 @@ class ReportSystem(commands.Cog):
                 pass
             return
 
+
+        if message.author.bot:
+            return
+
         try:
             # Create DM channel and send prompt
             await user.send(
