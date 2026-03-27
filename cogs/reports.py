@@ -137,6 +137,16 @@ class ReportSystem(commands.Cog):
             print("[DEBUG] No permission to fetch message.")
             return
 
+        # Check if the message is a reply to the bot's message
+        if message.reference:
+            try:
+                referenced_message = await channel.fetch_message(message.reference.message_id)
+                if referenced_message.author.id == self.bot.user.id:
+                    print("[DEBUG] Ignoring SOS reaction on reply to bot message.")
+                    return
+            except (discord.NotFound, discord.Forbidden):
+                pass
+
         await self._process_report(user, message, channel, guild)
 
     @commands.Cog.listener()
