@@ -30,14 +30,20 @@ class Punishments(commands.Cog):
             await log_channel.send(embed=embed)
 
     async def trigger_ban_vote(self, ctx, member):
-        mod_channel_id = 771072621595983893  
-        mod_channel = ctx.guild.get_channel(mod_channel_id)
-        mod_roles_ping = "@୧ : ASSISTANT REFREE ᐟ⋆ @୧ :REFEREE ᐟ⋆ @୧ : CLUB DIRECTOR ᐟ⋆"
+        try:
+            mod_channel_id = 771072621595983893
+            mod_channel = ctx.guild.get_channel(mod_channel_id)
+            mod_roles_ping = "@୧ : ASSISTANT REFREE ᐟ⋆ @୧ :REFEREE ᐟ⋆ @୧ : CLUB DIRECTOR ᐟ⋆"
 
-        if mod_channel:
+            if not mod_channel:
+                return
+
             embed = discord.Embed(
                 title="🚨 Ban Vote Triggered",
-                description=f"{mod_roles_ping}\n{member.mention} has reached **15 MP**. Vote to ban this user.",
+                description=(
+                    f"{mod_roles_ping}\n{member.mention} has reached **15 MP**. "
+                    "Vote to ban this user. This vote closes in **24 hours**."
+                ),
                 color=discord.Color.red(),
                 timestamp=datetime.utcnow()
             )
@@ -45,18 +51,19 @@ class Punishments(commands.Cog):
             await message.add_reaction("✅")  # Yes
             await message.add_reaction("❌")  # No
 
-            def check(reaction, user):
-                return (
-                    reaction.message.id == message.id
-                    and str(reaction.emoji) in ["✅", "❌"]
-                    and not user.bot
-                )
-
-            await sleep(120)  # Wait for 2 minutes
+            await sleep(86400)  # Wait 24 hours for votes
             message = await mod_channel.fetch_message(message.id)
 
-            yes_votes = sum(1 for r in message.reactions if str(r.emoji) == "✅" for _ in await r.users().flatten() if not _.bot)
-            no_votes = sum(1 for r in message.reactions if str(r.emoji) == "❌" for _ in await r.users().flatten() if not _.bot)
+            yes_votes = no_votes = 0
+            for r in message.reactions:
+                if str(r.emoji) == "✅":
+                    async for u in r.users():
+                        if not u.bot:
+                            yes_votes += 1
+                elif str(r.emoji) == "❌":
+                    async for u in r.users():
+                        if not u.bot:
+                            no_votes += 1
 
             if yes_votes > no_votes:
                 try:
@@ -66,6 +73,8 @@ class Punishments(commands.Cog):
                     await mod_channel.send(f"❌ Failed to ban {member.mention}. Please check permissions.")
             else:
                 await mod_channel.send(f"✅ {member.mention} has been **spared**. Vote did not pass.")
+        except Exception as e:
+            print(f"[ERROR] ban vote failed for guild {ctx.guild.id} user {member.id}: {e}")
 
     async def remove_yellow_card_after_timeout(self, member: discord.Member, duration: int):
             
@@ -163,7 +172,7 @@ class Punishments(commands.Cog):
             # Check MP thresholds first
             if total_points >= 15:
                 await ctx.send(f"🚨 **Ban vote triggered for {member.mention}** (15 MP reached).")
-                await self.trigger_ban_vote(ctx, member)
+                self.bot.loop.create_task(self.trigger_ban_vote(ctx, member))
                 return
             
             # Get base duration for this offense
