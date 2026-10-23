@@ -15,6 +15,15 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client["SentinelOne"]
 users_collection = db["Users"]
 
+async def ensure_indexes() -> None:
+    """One record per (guild, user). Lets lookups use an index instead of scanning
+    the whole collection, and stops concurrent first punishments from creating
+    duplicate records. Fails if duplicates already exist; merge those first."""
+    await users_collection.create_index(
+        [("guild_id", 1), ("user_id", 1)], unique=True, name="guild_user_unique"
+    )
+
+
 async def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional[str] = None) -> Tuple[int, bool]:
     """
     Add a warning to a user's record
@@ -26,27 +35,29 @@ async def add_warning(guild_id: int, user_id: int, mod_id: int, reason: Optional
         "mod_id": mod_id,
         "reason": reason
     }
-    
-    await users_collection.update_one(
+
+    # Push and read back in one atomic step, so two warnings issued at the same
+    # moment get counts N and N+1 instead of both seeing N+1.
+    user_data = await users_collection.find_one_and_update(
         {"guild_id": guild_id, "user_id": user_id},
         {
             "$push": {"warnings": warning},
             "$setOnInsert": {"total_points": 0, "punishments": []}
         },
-        upsert=True
-    )
-    
-    user_data = await users_collection.find_one(
-        {"guild_id": guild_id, "user_id": user_id}
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
     )
     warning_count = len(user_data.get("warnings", []))
-    
+
     # Second warning gets 5min mute, third warning converts to 1MP
     return warning_count, warning_count in [2, 3]
 
 async def add_punishment(guild_id: int, user_id: int, reason: str, points: int, warning_count: int = 0) -> int:
-    """Add punishment to the database and update total points."""
-    user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
+    """Add punishment to the database and update total points.
+
+    Single atomic upsert that returns the total *after* this punishment, so two
+    mods punishing the same user at once each see the real running total and the
+    15 MP ban vote fires exactly once."""
     new_entry = {
         "reason": reason,
         "points": points,
@@ -54,36 +65,27 @@ async def add_punishment(guild_id: int, user_id: int, reason: str, points: int, 
         "warning_count": warning_count
     }
 
-    if user_data:
-        # Handle third warning conversion to MP
-        if warning_count >= 3:
-            await users_collection.update_one(
-                {"guild_id": guild_id, "user_id": user_id},
-                {
-                    "$inc": {"total_points": 1},  # Add 1 MP for third warning
-                    "$push": {"punishments": new_entry},
-                    "$set": {"warnings": []}  # Clear warnings after conversion
-                }
-            )
-            return user_data["total_points"] + 1
-        else:
-            await users_collection.update_one(
-                {"guild_id": guild_id, "user_id": user_id},
-                {
-                    "$inc": {"total_points": points},
-                    "$push": {"punishments": new_entry}
-                }
-            )
-            return user_data["total_points"] + points
+    if warning_count >= 3:
+        # Third warning converts to 1 MP and clears warnings
+        update = {
+            "$inc": {"total_points": 1},
+            "$push": {"punishments": new_entry},
+            "$set": {"warnings": []},
+        }
     else:
-        await users_collection.insert_one({
-            "guild_id": guild_id,
-            "user_id": user_id,
-            "total_points": points,
-            "punishments": [new_entry],
-            "warnings": []
-        })
-        return points
+        update = {
+            "$inc": {"total_points": points},
+            "$push": {"punishments": new_entry},
+            "$setOnInsert": {"warnings": []},
+        }
+
+    user_data = await users_collection.find_one_and_update(
+        {"guild_id": guild_id, "user_id": user_id},
+        update,
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return user_data["total_points"]
 
 async def get_warnings(guild_id: int, user_id: int) -> List[Dict]:
     """Get all warnings for a user"""
@@ -127,51 +129,30 @@ async def clear_points(guild_id: int, user_id: int) -> bool:
     return result.modified_count > 0
 
 async def check_expired_points(guild_id: int, user_id: int) -> int:
-    """Remove expired points (older than 20 days) and return new total"""
+    """Remove expired points (older than 20 days) and return new total.
+
+    Done as one server-side update instead of read -> filter in Python -> $set.
+    The old version could overwrite a punishment that another command added
+    between the read and the write (e.g. !points running during !punish)."""
     expiry_date = datetime.utcnow() - timedelta(days=20)
-    
-    user_data = await users_collection.find_one({"guild_id": guild_id, "user_id": user_id})
+
+    as_date = {"$convert": {"input": "$$p.timestamp", "to": "date", "onError": None, "onNull": None}}
+    user_data = await users_collection.find_one_and_update(
+        {"guild_id": guild_id, "user_id": user_id},
+        [
+            {"$set": {"punishments": {"$filter": {
+                "input": {"$ifNull": ["$punishments", []]},
+                "as": "p",
+                # entries with a missing/unparseable timestamp are dropped, as before
+                "cond": {"$gt": [as_date, expiry_date]},
+            }}}},
+            {"$set": {"total_points": {"$sum": "$punishments.points"}}},
+        ],
+        return_document=ReturnDocument.AFTER,
+    )
     if not user_data:
         return 0
-
-    active_punishments = []
-    total_points = 0
-    
-    for punishment in user_data.get('punishments', []):
-        # tolerate malformed data so a single bad entry doesn't crash the bot
-        try:
-            ts = punishment.get('timestamp')
-            if not isinstance(ts, datetime):
-                # try parsing ISO string if present
-                if isinstance(ts, str):
-                    try:
-                        ts = datetime.fromisoformat(ts)
-                    except Exception:
-                        # give up on this entry
-                        print(f"[WARNING] bad timestamp for user {user_id}: {ts}")
-                        continue
-                else:
-                    print(f"[WARNING] unexpected timestamp type for user {user_id}: {type(ts)}")
-                    continue
-            if ts > expiry_date:
-                active_punishments.append(punishment)
-                total_points += punishment.get('points', 0)
-        except Exception as exc:
-            print(f"[ERROR] check_expired_points skipped entry due to {exc}")
-            continue
-
-    # Update database with only active punishments
-    await users_collection.update_one(
-        {"guild_id": guild_id, "user_id": user_id},
-        {
-            "$set": {
-                "punishments": active_punishments,
-                "total_points": total_points
-            }
-        }
-    )
-    
-    return total_points
+    return user_data.get("total_points", 0)
 
 async def deductpoints(guild_id: int, user_id: int, points_to_deduct: int) -> int:
     """

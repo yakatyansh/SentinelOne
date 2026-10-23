@@ -13,6 +13,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class ReportSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Users with a report waiting for its DM reason. The reply can't say which
+        # report it belongs to, so with two open, one reply was logged under both
+        # and the second was lost.
+        self.pending_reports = set()
 
     async def _process_report(self, user, message, channel, guild):
         # Don't allow reporting your own messages
@@ -27,6 +31,20 @@ class ReportSystem(commands.Cog):
         if message.author.bot:
             return
 
+        if user.id in self.pending_reports:
+            try:
+                await user.send("⏳ Please finish your current report (reply with the reason) before starting another one.")
+            except discord.Forbidden:
+                pass
+            return
+
+        self.pending_reports.add(user.id)
+        try:
+            await self._collect_report(user, message, channel, guild)
+        finally:
+            self.pending_reports.discard(user.id)
+
+    async def _collect_report(self, user, message, channel, guild):
         try:
             # Create DM channel and send prompt
             await user.send(
@@ -103,8 +121,7 @@ class ReportSystem(commands.Cog):
     async def on_raw_reaction_add(self, payload):
         # Check if it's the SOS emoji (🆘)
         if str(payload.emoji) != '🆘':
-            print(f"[DEBUG] Ignoring emoji: {payload.emoji}")
-            return
+            return  # fires for every reaction in the server; don't log here
 
         print(f"[DEBUG] SOS reaction detected by user {payload.user_id}")
 

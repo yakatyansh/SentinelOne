@@ -13,6 +13,13 @@ class Punishments(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_load(self):
+        try:
+            await db.ensure_indexes()
+        except Exception as e:
+            # Most likely duplicate (guild_id, user_id) records already exist.
+            print(f"[ERROR] could not create unique index on Users(guild_id, user_id): {e}")
+
     async def log_punishment(self, ctx, target_user, reason, mp_given, duration):
         log_channel_id = 1406574258573803661  
         log_channel = ctx.guild.get_channel(log_channel_id)
@@ -121,7 +128,6 @@ class Punishments(commands.Cog):
                 return
 
             if reason == "advisory":
-                warning_count = await db.get_warning_count(ctx.guild.id, member.id)
                 warning_count, should_mute = await db.add_warning(ctx.guild.id, member.id, ctx.author.id, reason)
 
                 if warning_count == 1:
